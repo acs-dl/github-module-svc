@@ -1,0 +1,33 @@
+log:
+  level: debug
+  disable_sentry: true
+
+db:
+  url: "postgres://github:github@localhost:5433/github?sslmode=disable"
+
+cache:
+  default_expiration: 35m #time for default duration of each cache item (f.e. 10m5s)
+  cleanup_interval: 5m #interval with which garbage collector will work (f.e. 10m5s)
+
+amqp:
+  topic: "github"
+  publisher: "amqp://guest:guest@localhost:5672/" #gitlab_publisher
+  subscriber: "amqp://guest:guest@localhost:5672/" #gitlab_receiver
+
+github: #access token for superuser
+  token: "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"
+
+listener:
+  addr: :9000
+
+registrator:
+  outer_url: "http://localhost:8000/integrations/orchestrator/modules" #configure MODULE outer endpoint
+  inner_url: "github" #configure MODULE inner endpoint
+  topic: "github" #configure MODULE topic
+
+cop:
+  disabled: true
+  endpoint: "http://..."
+  upstream: "http://..."
+  service_name: core
+  service_port: 80

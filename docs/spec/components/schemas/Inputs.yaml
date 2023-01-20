@@ -1,0 +1,22 @@
+allOf:
+  - $ref: "#/components/schemas/InputsKey"
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - username
+          - link
+          - permission
+        properties:
+          username:
+            type: string
+            description: username from github
+          link:
+            type: string
+            description: link for which would be given access
+          permission:
+            type: string
+            description: level of access that would be given

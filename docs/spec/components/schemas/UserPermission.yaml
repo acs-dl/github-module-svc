@@ -1,0 +1,30 @@
+allOf:
+  - $ref: "#/components/schemas/UserPermissionKey"
+  - type: object
+    required:
+      - attributes
+    properties:
+      attributes:
+        type: object
+        required:
+          - username
+          - github_id
+          - link
+          - permission
+          - type
+        properties:
+          username:
+            type: string
+            description: username from github
+          github_id:
+            type: int64
+            description: user id from github
+          link:
+            type: string
+            description: link for which was given access
+          type:
+            type: string
+            description: type of link (org or repo)
+          permission:
+            type: string
+            description: level of success for link

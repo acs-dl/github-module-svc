@@ -1,0 +1,21 @@
+get:
+  tags:
+    - Roles
+  summary: Get roles
+  operationId: getRoles
+  description: Endpoint for getting all available roles (permission to set) from github module to pass them in FE.
+  responses:
+    '200':
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                $ref: '#/components/schemas/Roles'
+    '400':
+      description: Bad request.
+    '500':
+      description: Internal server error.

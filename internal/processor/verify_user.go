@@ -1,0 +1,51 @@
+package processor
+
+import (
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/logan/v3/errors"
+)
+
+func (p *processor) validateVerifyUser(msg data.ModulePayload) error {
+	return validation.Errors{
+		"user_id":  validation.Validate(msg.UserId, validation.Required),
+		"username": validation.Validate(msg.Username, validation.Required),
+	}.Filter()
+}
+
+func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
+	p.log.Infof("start handle message action with id `%s`", msg.RequestId)
+
+	err := p.validateVerifyUser(msg)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to validate fields for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to validate fields")
+	}
+
+	githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to get user id from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "some error while getting user id from api")
+	}
+
+	err = p.managerQ.Transaction(func() error {
+		if err = p.usersQ.Upsert(data.User{Id: &msg.UserId, Username: msg.Username, GithubId: *githubId}); err != nil {
+			p.log.WithError(err).Errorf("failed to upsert user in user db for message action with id `%s`", msg.RequestId)
+			return errors.Wrap(err, "failed to upsert user in user db")
+		}
+
+		if err = p.permissionsQ.UpdateUserId(data.Permission{UserId: &msg.UserId, GithubId: *githubId}); err != nil {
+			p.log.WithError(err).Errorf("failed to update user id in permission db for message action with id `%s`", msg.RequestId)
+			return errors.Wrap(err, "failed to update user id in user db")
+		}
+
+		return nil
+	})
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to make add user transaction for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to make add user transaction")
+	}
+
+	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
+	return nil
+}
