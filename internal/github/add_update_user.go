@@ -11,7 +11,7 @@ import (
 )
 
 func (g *github) AddUserFromApi(link, username, permission string) (*data.Permission, error) {
-	findType, err := g.FindType(link)
+	findType, _, err := g.FindType(link)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get type")
 	}
@@ -22,7 +22,7 @@ func (g *github) AddUserFromApi(link, username, permission string) (*data.Permis
 
 	switch findType {
 	case data.Repository:
-		isCollaborator, err := g.CheckRepoCollaborator(link, username)
+		isCollaborator, _, err := g.CheckRepoCollaborator(link, username)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if user in repo from api")
 		}
@@ -33,7 +33,7 @@ func (g *github) AddUserFromApi(link, username, permission string) (*data.Permis
 
 		return g.AddOrUpdateUserInRepoFromApi(link, username, permission)
 	case data.Organization:
-		isCollaborator, err := g.CheckOrgCollaborator(link, username)
+		isCollaborator, _, err := g.CheckOrgCollaborator(link, username)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if user in org from api")
 		}
@@ -49,7 +49,7 @@ func (g *github) AddUserFromApi(link, username, permission string) (*data.Permis
 }
 
 func (g *github) UpdateUserFromApi(link, username, permission string) (*data.Permission, error) {
-	findType, err := g.FindType(link)
+	findType, _, err := g.FindType(link)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get type")
 	}
@@ -60,7 +60,7 @@ func (g *github) UpdateUserFromApi(link, username, permission string) (*data.Per
 
 	switch findType {
 	case data.Repository:
-		isCollaborator, err := g.CheckRepoCollaborator(link, username)
+		isCollaborator, _, err := g.CheckRepoCollaborator(link, username)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if user in repo from api")
 		}
@@ -80,7 +80,7 @@ func (g *github) UpdateUserFromApi(link, username, permission string) (*data.Per
 
 		return g.AddOrUpdateUserInRepoFromApi(link, username, permission)
 	case data.Organization:
-		isCollaborator, err := g.CheckOrgCollaborator(link, username)
+		isCollaborator, _, err := g.CheckOrgCollaborator(link, username)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to check if user in org from api")
 		}
@@ -127,10 +127,10 @@ func (g *github) AddOrUpdateUserInRepoFromApi(link, username, permission string)
 	//we updated permission
 	if res.StatusCode == 204 {
 		return &data.Permission{
-			Link:       link,
-			Username:   username,
-			Permission: permission,
-			Type:       data.Repository,
+			Link:        link,
+			Username:    username,
+			AccessLevel: permission,
+			Type:        data.Repository,
 		}, nil
 	}
 
@@ -139,8 +139,9 @@ func (g *github) AddOrUpdateUserInRepoFromApi(link, username, permission string)
 			FullName string `json:"full_name"`
 		} `json:"repository"`
 		Invitee struct {
-			Login string `json:"login"`
-			Id    int64  `json:"id"`
+			Login     string `json:"login"`
+			Id        int64  `json:"id"`
+			AvatarUrl string `json:"avatar_url"`
 		} `json:"invitee"`
 		Permissions string `json:"permissions"`
 	}{}
@@ -150,11 +151,12 @@ func (g *github) AddOrUpdateUserInRepoFromApi(link, username, permission string)
 	}
 
 	return &data.Permission{
-		Link:       returned.Repository.FullName,
-		Username:   returned.Invitee.Login,
-		GithubId:   returned.Invitee.Id,
-		Permission: returned.Permissions,
-		Type:       data.Repository,
+		Link:        returned.Repository.FullName,
+		Username:    returned.Invitee.Login,
+		GithubId:    returned.Invitee.Id,
+		AccessLevel: returned.Permissions,
+		Type:        data.Repository,
+		AvatarUrl:   returned.Invitee.AvatarUrl,
 	}, nil
 
 }
@@ -204,11 +206,11 @@ func (g *github) AddOrUpdateUserInOrgFromApi(link, username, permission string) 
 	}
 
 	return &data.Permission{
-		Link:       returned.Repository.FullName,
-		Username:   returned.Invitee.Login,
-		GithubId:   returned.Invitee.Id,
-		Permission: returned.Role,
-		Type:       data.Organization,
+		Link:        returned.Repository.FullName,
+		Username:    returned.Invitee.Login,
+		GithubId:    returned.Invitee.Id,
+		AccessLevel: returned.Role,
+		Type:        data.Organization,
 	}, nil
 
 }

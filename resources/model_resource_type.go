@@ -10,7 +10,9 @@ type ResourceType string
 const (
 	INPUTS          ResourceType = "inputs"
 	LINKS           ResourceType = "links"
-	PERMISSION      ResourceType = "permission"
+	MODULES         ResourceType = "modules"
+	REQUESTS        ResourceType = "requests"
 	ROLES           ResourceType = "roles"
+	USER            ResourceType = "user"
 	USER_PERMISSION ResourceType = "user_permission"
 )

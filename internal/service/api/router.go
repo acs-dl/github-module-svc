@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/go-chi/chi"
+	auth "gitlab.com/distributed_lab/acs/auth/middlewares"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
@@ -13,6 +14,8 @@ func (r *apiRouter) apiRouter() chi.Router {
 	router := chi.NewRouter()
 
 	logger := r.cfg.Log().WithField("service", fmt.Sprintf("%s-api", data.ModuleName))
+
+	secret := r.cfg.JwtParams().Secret
 
 	router.Use(
 		ape.RecoverMiddleware(logger),
@@ -25,6 +28,7 @@ func (r *apiRouter) apiRouter() chi.Router {
 			handlers.CtxPermissionsQ(postgres.NewPermissionsQ(r.cfg.DB())),
 			handlers.CtxUsersQ(postgres.NewUsersQ(r.cfg.DB())),
 			handlers.CtxLinksQ(postgres.NewLinksQ(r.cfg.DB())),
+			handlers.CtxSubsQ(postgres.NewSubsQ(r.cfg.DB())),
 
 			// connectors
 
@@ -33,19 +37,28 @@ func (r *apiRouter) apiRouter() chi.Router {
 		),
 	)
 
-	router.Route("/integrations/gitlab", func(r chi.Router) {
-		r.Get("/get_input", handlers.GetInputs)
-		r.Get("/get_available_roles", handlers.GetRoles)
+	router.Route("/integrations/github", func(r chi.Router) {
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Get("/get_input", handlers.GetInputs)
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Get("/get_available_roles", handlers.GetRoles)
 
-		r.Route("/links", func(r chi.Router) {
-			r.Post("/", handlers.AddLink)
-			r.Delete("/", handlers.RemoveLink)
-		})
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Route("/links", func(r chi.Router) {
+				r.Post("/", handlers.AddLink)
+				r.Delete("/", handlers.RemoveLink)
+			})
 
+		//r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
 		r.Get("/permissions", handlers.GetPermissions)
 
-		r.Route("/users/{id}", func(r chi.Router) {
-			r.Get("/permissions", handlers.GetUserPermissions)
+		r.Route("/users", func(r chi.Router) {
+			r.Get("/{id}", handlers.GetUserById) // comes from orchestrator
+
+			r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+				Get("/", handlers.GetUsers)
+			r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+				Get("/unverified", handlers.GetUnverifiedUsers)
 		})
 	})
 

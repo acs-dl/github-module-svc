@@ -5,10 +5,10 @@
 package resources
 
 type InputsAttributes struct {
+	// level of access that would be given
+	AccessLevel string `json:"access_level"`
 	// link for which would be given access
 	Link string `json:"link"`
-	// level of access that would be given
-	Permission string `json:"permission"`
-	// username from github
+	// username from gitlab
 	Username string `json:"username"`
 }

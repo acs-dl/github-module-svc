@@ -4,14 +4,16 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
+	"strconv"
+	"time"
 )
 
 func (p *processor) validateAddUser(msg data.ModulePayload) error {
 	return validation.Errors{
-		"link":       validation.Validate(msg.Link, validation.Required),
-		"username":   validation.Validate(msg.Username, validation.Required),
-		"user_id":    validation.Validate(msg.UserId, validation.Required),
-		"permission": validation.Validate(msg.Permission, validation.Required),
+		"link":         validation.Validate(msg.Link, validation.Required),
+		"username":     validation.Validate(msg.Username, validation.Required),
+		"user_id":      validation.Validate(msg.UserId, validation.Required),
+		"access_level": validation.Validate(msg.AccessLevel, validation.Required),
 	}.Filter()
 }
 
@@ -24,7 +26,13 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	permission, err := p.githubClient.AddUserFromApi(msg.Link, msg.Username, msg.Permission)
+	userId, err := strconv.ParseInt(msg.UserId, 10, 64)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to parse user id `%s` for message action with id `%s`", msg.UserId, msg.RequestId)
+		return errors.Wrap(err, "failed to parse user id")
+	}
+
+	permission, err := p.githubClient.AddUserFromApi(msg.Link, msg.Username, msg.AccessLevel)
 	if err != nil {
 		return err
 	}
@@ -33,13 +41,19 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Errorf("something wrong with adding user from api")
 	}
 
-	permission.UserId = &msg.UserId
+	permission.UserId = &userId
 	permission.RequestId = msg.RequestId
 
 	err = p.managerQ.Transaction(func() error {
-		if err = p.usersQ.Upsert(data.User{Id: &msg.UserId, Username: permission.Username, GithubId: permission.GithubId}); err != nil {
-			p.log.WithError(err).Errorf("failed to upsert user in user db for message action with id `%s`", msg.RequestId)
-			return errors.Wrap(err, "failed to upsert user in user db")
+		if err = p.usersQ.Upsert(data.User{
+			Id:        &userId,
+			Username:  permission.Username,
+			GithubId:  permission.GithubId,
+			CreatedAt: time.Now(),
+			AvatarUrl: permission.AvatarUrl,
+		}); err != nil {
+			p.log.WithError(err).Errorf("failed to creat user in user db for message action with id `%s`", msg.RequestId)
+			return errors.Wrap(err, "failed to create user in user db")
 		}
 
 		if err = p.permissionsQ.Upsert(*permission); err != nil {

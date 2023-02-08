@@ -8,9 +8,9 @@ import (
 
 func (p *processor) validateUpdateUser(msg data.ModulePayload) error {
 	return validation.Errors{
-		"link":       validation.Validate(msg.Link, validation.Required),
-		"username":   validation.Validate(msg.Username, validation.Required),
-		"permission": validation.Validate(msg.Permission, validation.Required),
+		"link":         validation.Validate(msg.Link, validation.Required),
+		"username":     validation.Validate(msg.Username, validation.Required),
+		"access_level": validation.Validate(msg.AccessLevel, validation.Required),
 	}.Filter()
 }
 
@@ -34,13 +34,13 @@ func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
 		return errors.New("no user with such username")
 	}
 
-	githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
+	_, githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get github id from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting github id from api")
 	}
 
-	permission, err := p.githubClient.UpdateUserFromApi(msg.Link, msg.Username, msg.Permission)
+	permission, err := p.githubClient.UpdateUserFromApi(msg.Link, msg.Username, msg.AccessLevel)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to update user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while updating user from api")

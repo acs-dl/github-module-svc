@@ -9,6 +9,8 @@ const (
 	UserOwned         = "User"
 	OrganizationOwned = "Organization"
 	Push              = "push"
+	Project           = "project"
+	Group             = "group"
 )
 
 type ModuleRequest struct {
@@ -22,11 +24,20 @@ type ModuleRequest struct {
 }
 
 type ModulePayload struct {
-	RequestId  string `json:"request_id"`
-	UserId     int64  `json:"user_id"`
-	Action     string `json:"action"`
-	Link       string `json:"link"`
-	Username   string `json:"username"`
-	Permission string `json:"permission"`
-	Type       string `json:"type_to"`
+	RequestId   string `json:"request_id"`
+	UserId      string `json:"user_id"`
+	Action      string `json:"action"`
+	Link        string `json:"link"`
+	Username    string `json:"username"`
+	AccessLevel string `json:"access_level"`
+	Type        string `json:"type"`
+}
+
+var Roles = map[string]string{
+	"read":     "Read",
+	"triage":   "Triage",
+	"write":    "Write",
+	"maintain": "Maintain",
+	"admin":    "Admin",
+	"member":   "Member",
 }

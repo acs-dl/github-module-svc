@@ -17,7 +17,7 @@ type PermissionsQ struct {
 	sql sq.SelectBuilder
 }
 
-var permissionsColumns = []string{"permissions.request_id", "permissions.user_id", "permissions.username", "permissions.github_id", "permissions.link", "permissions.permission", "permissions.type_to"}
+var permissionsColumns = []string{"permissions.request_id", "permissions.user_id", "permissions.username", "permissions.github_id", "permissions.link", "permissions.access_level", "permissions.type"}
 
 func NewPermissionsQ(db *pgdb.DB) data.Permissions {
 	return &PermissionsQ{
@@ -41,7 +41,7 @@ func (q *PermissionsQ) Create(permission data.Permission) error {
 func (q *PermissionsQ) Update(permission data.Permission) error {
 	query := sq.Update(permissionsTableName).
 		Set("username", permission.Username).
-		Set("permission", permission.Permission).
+		Set("access_level", permission.AccessLevel).
 		Where(
 			sq.Eq{"github_id": permission.GithubId, "link": permission.Link})
 
@@ -52,6 +52,17 @@ func (q *PermissionsQ) UpdateUserId(permission data.Permission) error {
 	query := sq.Update(permissionsTableName).
 		Set("user_id", permission.UserId).
 		Where(sq.Eq{"github_id": permission.GithubId})
+
+	return q.db.Exec(query)
+}
+
+func (q *PermissionsQ) UpdateParentLevel(permission data.Permission) error {
+	query := sq.Update(permissionsTableName).
+		Set("parent_level", permission.ParentLevel).
+		Where(sq.Eq{
+			"github_id": permission.GithubId,
+			"link":      permission.Link,
+		})
 
 	return q.db.Exec(query)
 }
@@ -72,7 +83,7 @@ func (q *PermissionsQ) Select() ([]data.Permission, error) {
 
 func (q *PermissionsQ) Upsert(permission data.Permission) error {
 	updUsername := fmt.Sprintf("username = '%s'", permission.Username)
-	updLevel := fmt.Sprintf("permission = '%s'", permission.Permission)
+	updLevel := fmt.Sprintf("access_level = '%s'", permission.AccessLevel)
 
 	query := sq.Insert(permissionsTableName).SetMap(structs.Map(permission)).
 		Suffix(fmt.Sprintf("ON CONFLICT (github_id, link) DO UPDATE SET %s, %s", updUsername, updLevel))
@@ -93,7 +104,7 @@ func (q *PermissionsQ) Get() (*data.Permission, error) {
 
 func (q *PermissionsQ) Delete(githubId int64, typeTo, link string) error {
 	query := sq.Delete(permissionsTableName).Where(
-		sq.Eq{"github_id": githubId, "type_to": typeTo, "link": link})
+		sq.Eq{"github_id": githubId, "type": typeTo, "link": link})
 
 	result, err := q.db.ExecWithResult(query)
 	if err != nil {
@@ -110,6 +121,30 @@ func (q *PermissionsQ) Delete(githubId int64, typeTo, link string) error {
 
 func (q *PermissionsQ) FilterByUserIds(ids ...int64) data.Permissions {
 	stmt := sq.Eq{permissionsTableName + ".user_id": ids}
+
+	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByGithubIds(ids ...int64) data.Permissions {
+	stmt := sq.Eq{permissionsTableName + ".github_id": ids}
+
+	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByUsernames(usernames ...string) data.Permissions {
+	stmt := sq.Eq{permissionsTableName + ".username": usernames}
+
+	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByLinks(links ...string) data.Permissions {
+	stmt := sq.Eq{permissionsTableName + ".link": links}
 
 	q.sql = q.sql.Where(stmt)
 

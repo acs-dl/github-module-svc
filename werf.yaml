@@ -28,6 +28,6 @@ shell:
     - apk add --no-cache ca-certificates
 import:
   - image: builder
-    add: /usr/local/bin/gitlab-module
-    to: /usr/local/bin/gitlab-module
+    add: /usr/local/bin/github-module
+    to: /usr/local/bin/github-module
     after: setup

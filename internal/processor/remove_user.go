@@ -33,13 +33,13 @@ func (p *processor) handleRemoveUserAction(msg data.ModulePayload) error {
 		return errors.New("no user with such username")
 	}
 
-	githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
+	_, githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get github id from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting github id from api")
 	}
 
-	msg.Type, err = p.githubClient.FindType(msg.Link)
+	msg.Type, _, err = p.githubClient.FindType(msg.Link)
 	if err != nil {
 		return errors.Wrap(err, "failed to get type")
 	}

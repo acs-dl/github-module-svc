@@ -20,6 +20,7 @@ const (
 	UpdateUserAction = "update_user"
 	RemoveUserAction = "remove_user"
 	VerifyUserAction = "verify_user"
+	DeleteUserAction = "delete_user"
 )
 
 type Processor interface {
@@ -40,6 +41,7 @@ var handleActions = map[string]func(proc *processor, msg data.ModulePayload) err
 	UpdateUserAction: (*processor).handleUpdateUserAction,
 	RemoveUserAction: (*processor).handleRemoveUserAction,
 	VerifyUserAction: (*processor).handleVerifyUserAction,
+	DeleteUserAction: (*processor).handleDeleteUserAction,
 }
 
 func NewProcessor(cfg config.Config) Processor {
@@ -65,7 +67,7 @@ func (p *processor) HandleNewMessage(msg data.ModulePayload) error {
 
 	requestHandler := handleActions[msg.Action]
 	if err = requestHandler(p, msg); err != nil {
-		p.log.WithError(err).Error("failed to handle message with id `%s`", msg.RequestId)
+		p.log.WithError(err).Errorf("failed to handle message with id `%s`", msg.RequestId)
 		return err
 	}
 

@@ -12,4 +12,4 @@ allOf:
           link:
             type: string
             description: link to repository or group
-            example: "distributed_lab/acs/github-module"
+            example: "distributed_lab/acs/gitlab-module"

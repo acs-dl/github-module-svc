@@ -21,6 +21,7 @@ type Config interface {
 	Github() *GithubCfg
 	Amqp() *AmqpData
 	Cache() *CacheData
+	JwtParams() *JwtCfg
 
 	// Registrator config for Core
 	Registrator() RegistratorConfig
@@ -41,6 +42,7 @@ type config struct {
 	amqp        comfig.Once
 	cache       comfig.Once
 	registrator comfig.Once
+	jwtCfg      comfig.Once
 }
 
 func New(getter kv.Getter) Config {

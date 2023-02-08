@@ -8,10 +8,10 @@ import (
 	"net/http"
 )
 
-func (g *github) GetUserIdFromApi(username string) (*int64, error) {
+func (g *github) GetUserIdFromApi(username string) (*data.User, *int64, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/users/%s", username), nil)
 	if err != nil {
-		return nil, errors.Wrap(err, " couldn't create request")
+		return nil, nil, errors.Wrap(err, " couldn't create request")
 	}
 
 	req.Header.Set("Accept", "application/vnd.github+json")
@@ -20,17 +20,21 @@ func (g *github) GetUserIdFromApi(username string) (*int64, error) {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, " error making http request")
+		return nil, nil, errors.Wrap(err, " error making http request")
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, errors.New(fmt.Sprintf("error in response from API, status %s", res.Status))
+		return nil, nil, errors.New(fmt.Sprintf("error in response from API, status %s", res.Status))
 	}
 
 	var returned data.Permission
 	if err := json.NewDecoder(res.Body).Decode(&returned); err != nil {
-		return nil, errors.Wrap(err, " failed to unmarshal body")
+		return nil, nil, errors.Wrap(err, " failed to unmarshal body")
 	}
 
-	return &returned.GithubId, nil
+	return &data.User{
+		Username:  returned.Username,
+		GithubId:  returned.GithubId,
+		AvatarUrl: returned.AvatarUrl,
+	}, &returned.GithubId, nil
 }

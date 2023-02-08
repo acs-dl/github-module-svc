@@ -1,28 +1,19 @@
 package requests
 
 import (
+	"gitlab.com/distributed_lab/urlval"
 	"net/http"
-
-	validation "github.com/go-ozzo/ozzo-validation"
 )
 
 type GetRolesRequest struct {
-	Module string `json:"module"`
-	Link   string `json:"data"`
+	Link     *string `filter:"link"`
+	Username *string `filter:"username"`
 }
 
 func NewGetRolesRequest(r *http.Request) (GetRolesRequest, error) {
 	var request GetRolesRequest
 
-	request.Module = r.URL.Query().Get("module")
-	request.Link = r.URL.Query().Get("link")
+	err := urlval.Decode(r.URL.Query(), &request)
 
-	return request, request.validate()
-}
-
-func (r *GetRolesRequest) validate() error {
-	return validation.Errors{
-		"module": validation.Validate(&r.Module, validation.Required),
-		"link":   validation.Validate(&r.Link, validation.Required),
-	}.Filter()
+	return request, err
 }

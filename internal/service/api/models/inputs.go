@@ -11,9 +11,9 @@ func NewInputsModel() resources.Inputs {
 			Type: resources.INPUTS,
 		},
 		Attributes: resources.InputsAttributes{
-			Username:   "string",
-			Link:       "string",
-			Permission: "string",
+			Username:    "string",
+			Link:        "string",
+			AccessLevel: "string",
 		},
 	}
 

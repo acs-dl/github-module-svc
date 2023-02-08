@@ -10,4 +10,4 @@ properties:
   value:
     type: string
     description: role value to use in BE
-    example: "pull"
+    example: "push"

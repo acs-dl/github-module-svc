@@ -4,19 +4,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"gitlab.com/distributed_lab/acs/orchestrator/resources"
+	"gitlab.com/distributed_lab/acs/github-module/resources"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
 )
 
-func RegisterModule(name, innerEndpoint, outerEndpoint string) error {
+func RegisterModule(name, endpoint, innerEndpoint, outerEndpoint string) error {
 	request := struct {
 		Data resources.Module `json:"data"`
 	}{
 		Data: resources.Module{
 			Attributes: resources.ModuleAttributes{
 				Name:     name,
-				Endpoint: innerEndpoint,
+				Endpoint: endpoint,
+				Link:     innerEndpoint,
 			},
 		},
 	}

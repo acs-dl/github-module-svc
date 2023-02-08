@@ -1,36 +1,37 @@
 package github
 
 import (
+	"encoding/json"
 	"fmt"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
 )
 
-func (g *github) FindType(link string) (string, error) {
-	repo, err := g.CheckRepoFromApi(link)
+func (g *github) FindType(link string) (string, *data.Sub, error) {
+	repo, err := g.GetRepoFromApi(link)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	if repo {
-		return data.Repository, err
+	if repo != nil {
+		return data.Repository, repo, err
 	}
 
-	org, err := g.CheckOrgFromApi(link)
+	org, err := g.GetOrgFromApi(link)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	if org {
-		return data.Organization, nil
+	if org != nil {
+		return data.Organization, org, nil
 	}
 
-	return "", nil
+	return "", nil, nil
 }
 
-func (g *github) CheckRepoFromApi(link string) (bool, error) {
+func (g *github) GetRepoFromApi(link string) (*data.Sub, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/repos/%s", link), nil)
 	if err != nil {
-		return false, errors.Wrap(err, " couldn't create request")
+		return nil, errors.Wrap(err, " couldn't create request")
 	}
 
 	req.Header.Set("Accept", "application/vnd.Github+json")
@@ -39,20 +40,30 @@ func (g *github) CheckRepoFromApi(link string) (bool, error) {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return false, errors.Wrap(err, " error making http request")
+		return nil, errors.Wrap(err, " error making http request")
 	}
 
-	if res.StatusCode == 200 {
-		return true, nil
+	if res.StatusCode == http.StatusNotFound {
+		return nil, nil
 	}
 
-	return false, nil
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("failed to get group status `%s`", res.Status)
+	}
+
+	var returned data.Sub
+	if err := json.NewDecoder(res.Body).Decode(&returned); err != nil {
+		return nil, errors.Wrap(err, " failed to unmarshal body")
+	}
+	returned.Type = data.Repository
+
+	return &returned, nil
 }
 
-func (g *github) CheckOrgFromApi(link string) (bool, error) {
+func (g *github) GetOrgFromApi(link string) (*data.Sub, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/orgs/%s", link), nil)
 	if err != nil {
-		return false, errors.Wrap(err, " couldn't create request")
+		return nil, errors.Wrap(err, " couldn't create request")
 	}
 
 	req.Header.Set("Accept", "application/vnd.Github+json")
@@ -61,12 +72,29 @@ func (g *github) CheckOrgFromApi(link string) (bool, error) {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return false, errors.Wrap(err, " error making http request")
+		return nil, errors.Wrap(err, " error making http request")
 	}
 
-	if res.StatusCode == 200 {
-		return true, nil
+	if res.StatusCode == http.StatusNotFound {
+		return nil, nil
 	}
 
-	return false, nil
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("failed to get group status `%s`", res.Status)
+	}
+
+	returned := struct {
+		Id    int64  `json:"id"`
+		Login string `json:"login"`
+	}{}
+	if err := json.NewDecoder(res.Body).Decode(&returned); err != nil {
+		return nil, errors.Wrap(err, " failed to unmarshal body")
+	}
+
+	return &data.Sub{
+		Id:   returned.Id,
+		Link: returned.Login,
+		Path: returned.Login,
+		Type: data.Organization,
+	}, nil
 }

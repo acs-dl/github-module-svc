@@ -4,6 +4,7 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
+	"time"
 )
 
 func (p *processor) validateGetUsers(msg data.ModulePayload) error {
@@ -21,13 +22,13 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	msg.Type, err = p.githubClient.FindType(msg.Link)
+	msg.Type, _, err = p.githubClient.FindType(msg.Link)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get type for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to get type")
 	}
 
-	if validation.Validate(msg.Type, validation.In(data.Organization, data.Repository)) != nil {
+	if validation.Validate(msg.Type, validation.Required, validation.In(data.Organization, data.Repository)) != nil {
 		p.log.WithError(err).Errorf("unexpected link type `%s` for message action with id `%s`", msg.Type, msg.RequestId)
 		return errors.Wrap(err, "something wrong with link type")
 	}
@@ -39,10 +40,28 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 	}
 
 	for _, user := range users {
+		//api doesn't return role for organization members
+		if msg.Type == data.Organization {
+			_, permission, err := p.githubClient.CheckOrgCollaborator(msg.Link, user.Username)
+			if err != nil {
+				p.log.WithError(err).Errorf("failed to get permission from api for message action with id `%s`", msg.RequestId)
+				return errors.Wrap(err, "failed to get permission from api")
+			}
+			if permission == nil {
+				p.log.Errorf("something went wrong with getting permission for message action with id `%s`", msg.RequestId)
+				return errors.Errorf("something went wrong with getting permission from api")
+			}
+			user.AccessLevel = permission.AccessLevel
+		}
 		err = p.managerQ.Transaction(func() error {
-			if err = p.usersQ.Upsert(data.User{Username: user.Username, GithubId: user.GithubId}); err != nil {
-				p.log.WithError(err).Errorf("failed to upsert user in user db for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "failed to upsert user in user db")
+			if err = p.usersQ.Upsert(data.User{
+				Username:  user.Username,
+				GithubId:  user.GithubId,
+				CreatedAt: time.Now(),
+				AvatarUrl: user.AvatarUrl,
+			}); err != nil {
+				p.log.WithError(err).Errorf("failed to creat user in user db for message action with id `%s`", msg.RequestId)
+				return errors.Wrap(err, "failed to create user in user db")
 			}
 
 			usrDb, err := p.usersQ.GetByUsername(user.Username)

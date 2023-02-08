@@ -9,18 +9,23 @@ type GithubClient interface {
 	AddOrUpdateUserInOrgFromApi(link, username, permission string) (*data.Permission, error)
 
 	GetUsersFromApi(link, typeTo string) ([]data.Permission, error)
-	GetUserIdFromApi(username string) (*int64, error)
+	GetUserIdFromApi(username string) (*data.User, *int64, error)
 
 	RemoveUserFromApi(link, username, typeTo string) error
 
-	CheckOrgFromApi(link string) (bool, error)
-	CheckRepoFromApi(link string) (bool, error)
-	CheckRepoCollaborator(link, username string) (bool, error)
-	CheckOrgCollaborator(link, username string) (bool, error)
+	GetOrgFromApi(link string) (*data.Sub, error)
+	GetRepoFromApi(link string) (*data.Sub, error)
+
+	CheckUserFromApi(link, username, typeTo string) (bool, *data.Permission, error)
+	CheckRepoCollaborator(link, username string) (bool, *data.Permission, error)
+	CheckOrgCollaborator(link, username string) (bool, *data.Permission, error)
 
 	//GetRolesFromApi(link string) (bool, error)
-	FindType(link string) (string, error)
+	FindType(link string) (string, *data.Sub, error)
 	FindRepoOwner(link string) (string, error)
+
+	SearchByFromApi(username string) ([]data.User, error)
+	GetProjectsFromApi(link string) ([]data.Sub, error)
 }
 
 type github struct {

@@ -17,6 +17,7 @@ const (
 	usersCtxKey
 	linksCtxKey
 	paramsCtxKey
+	subsCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -66,5 +67,15 @@ func LinksQ(r *http.Request) data.Links {
 func CtxLinksQ(entry data.Links) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
 		return context.WithValue(ctx, linksCtxKey, entry)
+	}
+}
+
+func SubsQ(r *http.Request) data.Subs {
+	return r.Context().Value(subsCtxKey).(data.Subs).New()
+}
+
+func CtxSubsQ(entry data.Subs) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, subsCtxKey, entry)
 	}
 }

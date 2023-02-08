@@ -9,14 +9,14 @@ allOf:
         required:
           - username
           - link
-          - permission
+          - access_level
         properties:
           username:
             type: string
-            description: username from github
+            description: username from gitlab
           link:
             type: string
             description: link for which would be given access
-          permission:
+          access_level:
             type: string
             description: level of access that would be given

@@ -4,6 +4,8 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
+	"strconv"
+	"time"
 )
 
 func (p *processor) validateVerifyUser(msg data.ModulePayload) error {
@@ -22,19 +24,31 @@ func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
+	userId, err := strconv.ParseInt(msg.UserId, 10, 64)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to parse user id `%s` for message action with id `%s`", msg.UserId, msg.RequestId)
+		return errors.Wrap(err, "failed to parse user id")
+	}
+
+	userApi, githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get user id from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting user id from api")
 	}
 
 	err = p.managerQ.Transaction(func() error {
-		if err = p.usersQ.Upsert(data.User{Id: &msg.UserId, Username: msg.Username, GithubId: *githubId}); err != nil {
+		if err = p.usersQ.Upsert(data.User{
+			Id:        &userId,
+			Username:  userApi.Username,
+			GithubId:  userApi.GithubId,
+			AvatarUrl: userApi.AvatarUrl,
+			CreatedAt: time.Now(),
+		}); err != nil {
 			p.log.WithError(err).Errorf("failed to upsert user in user db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to upsert user in user db")
 		}
 
-		if err = p.permissionsQ.UpdateUserId(data.Permission{UserId: &msg.UserId, GithubId: *githubId}); err != nil {
+		if err = p.permissionsQ.UpdateUserId(data.Permission{UserId: &userId, GithubId: *githubId}); err != nil {
 			p.log.WithError(err).Errorf("failed to update user id in permission db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to update user id in user db")
 		}

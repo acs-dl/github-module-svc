@@ -9,6 +9,7 @@ import (
 type RegistratorConfig struct {
 	OuterUrl string `fig:"outer_url,required"`
 	InnerUrl string `fig:"inner_url,required"`
+	Endpoint string `fig:"endpoint,required"`
 	Topic    string `fig:"topic,required"`
 }
 
