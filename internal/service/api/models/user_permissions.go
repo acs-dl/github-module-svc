@@ -25,7 +25,7 @@ func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPerm
 			Level:    permission.Nlevel,
 			Type:     permission.Type,
 			Link:     permission.Link,
-			AccessLevel: resources.Role{
+			AccessLevel: resources.AccessLevel{
 				Name:  data.Roles[permission.AccessLevel],
 				Value: permission.AccessLevel,
 			},

@@ -12,6 +12,7 @@ const (
 	LINKS           ResourceType = "links"
 	MODULES         ResourceType = "modules"
 	REQUESTS        ResourceType = "requests"
+	ROLE            ResourceType = "role"
 	ROLES           ResourceType = "roles"
 	USER            ResourceType = "user"
 	USER_PERMISSION ResourceType = "user_permission"

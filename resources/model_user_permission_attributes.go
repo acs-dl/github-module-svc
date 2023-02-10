@@ -9,7 +9,7 @@ import (
 )
 
 type UserPermissionAttributes struct {
-	AccessLevel Role `json:"access_level"`
+	AccessLevel AccessLevel `json:"access_level"`
 	// indicates whether element have nested object
 	Deployable bool `json:"deployable"`
 	// shows when permission is expired

@@ -5,7 +5,7 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/resources"
 )
 
-var orgRepoRoles = []resources.Role{
+var orgRepoRoles = []resources.AccessLevel{
 	{Name: "Read", Value: "read"},
 	{Name: "Triage", Value: "triage"},
 	{Name: "Write", Value: "write"},
@@ -13,16 +13,16 @@ var orgRepoRoles = []resources.Role{
 	{Name: "Admin", Value: "admin"},
 }
 
-var userRepoRoles = []resources.Role{
+var userRepoRoles = []resources.AccessLevel{
 	{Name: "Write", Value: "write"},
 }
 
-var orgRoles = []resources.Role{
+var orgRoles = []resources.AccessLevel{
 	{Name: "Member", Value: "member"},
 	{Name: "Admin", Value: "admin"},
 }
 
-func NewRolesModel(found bool, roles []resources.Role) resources.Roles {
+func NewRolesModel(found bool, roles []resources.AccessLevel) resources.Roles {
 	result := resources.Roles{
 		Key: resources.Key{
 			ID:   "roles",
@@ -40,7 +40,7 @@ func NewRolesModel(found bool, roles []resources.Role) resources.Roles {
 func NewRolesResponse(found bool, typeTo, owned, current string) resources.RolesResponse {
 	if !found {
 		return resources.RolesResponse{
-			Data: NewRolesModel(found, []resources.Role{}),
+			Data: NewRolesModel(found, []resources.AccessLevel{}),
 		}
 	}
 
@@ -61,8 +61,8 @@ func NewRolesResponse(found bool, typeTo, owned, current string) resources.Roles
 	}
 }
 
-func newRolesArray(current string, roles []resources.Role) []resources.Role {
-	var result []resources.Role
+func newRolesArray(current string, roles []resources.AccessLevel) []resources.AccessLevel {
+	var result []resources.AccessLevel
 
 	for _, role := range roles {
 		if role.Value != current {

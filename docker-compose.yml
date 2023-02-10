@@ -8,4 +8,4 @@ services:
       POSTGRES_USER: "github"
       POSTGRES_PASSWORD: "github"
     ports:
-      - '5433:5432'
+      - '5436:5432'

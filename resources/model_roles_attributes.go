@@ -5,7 +5,7 @@
 package resources
 
 type RolesAttributes struct {
-	List []Role `json:"list"`
+	List []AccessLevel `json:"list"`
 	// flag to show if any role was found for given link
 	Req bool `json:"req"`
 }

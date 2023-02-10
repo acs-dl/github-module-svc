@@ -17,4 +17,4 @@ allOf:
             type: array
             items:
               type: object
-              $ref: "#/components/schemas/Role"
+              $ref: "#/components/schemas/AccessLevel"
