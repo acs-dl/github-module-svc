@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS links (
     UNIQUE(link)
 );
 INSERT INTO links (link) VALUES ('mhrynenko/TESTAPI');
-INSERT INTO links (link) VALUES ('mhrynenkotestapi');
--- INSERT INTO links (link) VALUES ('tokend');
+INSERT INTO links (link) VALUES ('acstestapi');
 
 CREATE INDEX IF NOT EXISTS links_link_idx ON links(link);
 

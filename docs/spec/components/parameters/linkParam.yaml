@@ -6,4 +6,4 @@ schema:
   description: >-
     Filter by parent links. If link param is not specified, permissions for highest level 
     are returned, if specified permissions where this link is parent are returned.
-  example: "distributed_lab/acs/"
+  example: "tokend/"

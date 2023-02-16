@@ -21,7 +21,7 @@ get:
                 type: array
                 items:
                   type: object
-                  $ref: '#/components/schemas/Permission'
+                  $ref: '#/components/schemas/UserPermission'
     '400':
       description: Bad request.
     '500':

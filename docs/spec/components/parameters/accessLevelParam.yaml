@@ -5,4 +5,4 @@ schema:
   type: string
   description: >-
     Filter by access level.
-  example: "40"
+  example: "push"

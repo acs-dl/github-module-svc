@@ -6,8 +6,8 @@ get:
   description: Endpoint for getting unverified users from github module.
   parameters:
     - $ref: '#/components/parameters/usernameParam'
-    - $ref: '#/components/parameters/page/pageLimitParam'
-    - $ref: '#/components/parameters/page/pageNumberParam'
+    - $ref: '#/components/parameters/pageLimitParam'
+    - $ref: '#/components/parameters/pageNumberParam'
   responses:
     '200':
       description: Success
