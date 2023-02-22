@@ -3,7 +3,7 @@ log:
   disable_sentry: true
 
 db:
-  url: "postgres://github:github@localhost:5436/github?sslmode=disable"
+  url: "postgres://github:github@localhost:5447/github?sslmode=disable"
 
 cache:
   default_expiration: 35m #time for default duration of each cache item (f.e. 10m5s)
@@ -21,10 +21,11 @@ listener:
   addr: :7000
 
 registrator:
-  outer_url: "http://localhost:8000/integrations/orchestrator/modules" #configure MODULE outer endpoint
-  inner_url: "http://localhost:7000/integrations/github" #configure MODULE inner endpoint
-  endpoint: "github" #configure MODULE endpoint
-  topic: "github" #configure MODULE topic
+  outer_url: "http://localhost:8000/integrations/orchestrator/modules" #endpoint to register MODULE
+  inner_url: "http://localhost:7000/integrations/github" #endpoint to MODULE itself
+  topic: "github" #MODULE topic
+  title: "Github" #MODULE title
+  prefix: "https://github.com"
 
 jwt:
   secret: SuPeR SeCrEt PhRaSe
