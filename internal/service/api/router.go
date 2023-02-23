@@ -49,8 +49,8 @@ func (r *apiRouter) apiRouter() chi.Router {
 				r.Delete("/", handlers.RemoveLink)
 			})
 
-		//r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
-		r.Get("/permissions", handlers.GetPermissions)
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Get("/permissions", handlers.GetPermissions)
 
 		r.Get("/role", handlers.GetRole)      // comes from orchestrator
 		r.Get("/roles", handlers.GetRolesMap) // comes from orchestrator
