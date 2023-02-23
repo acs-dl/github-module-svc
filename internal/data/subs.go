@@ -23,7 +23,7 @@ type Subs interface {
 	WithPermissions() Subs
 	FilterByGithubIds(githubIds ...int64) Subs
 	FilterByUserIds(userIds ...int64) Subs
-	FilterByParentLevel(level bool) Subs
+	FilterByHasParent(level bool) Subs
 
 	ResetFilters() Subs
 

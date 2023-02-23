@@ -56,9 +56,20 @@ func (q *PermissionsQ) UpdateUserId(permission data.Permission) error {
 	return q.db.Exec(query)
 }
 
-func (q *PermissionsQ) UpdateParentLevel(permission data.Permission) error {
+func (q *PermissionsQ) UpdateHasParent(permission data.Permission) error {
 	query := sq.Update(permissionsTableName).
-		Set("parent_level", permission.ParentLevel).
+		Set("has_parent", permission.HasParent).
+		Where(sq.Eq{
+			"github_id": permission.GithubId,
+			"link":      permission.Link,
+		})
+
+	return q.db.Exec(query)
+}
+
+func (q *PermissionsQ) UpdateHasChild(permission data.Permission) error {
+	query := sq.Update(permissionsTableName).
+		Set("has_child", permission.HasChild).
 		Where(sq.Eq{
 			"github_id": permission.GithubId,
 			"link":      permission.Link,

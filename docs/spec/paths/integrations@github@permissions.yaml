@@ -3,12 +3,11 @@ get:
     - Permissions
   summary: Get permission list
   operationId: getPermissions
-  description: Endpoint for getting all permissions from github module.
+  description: Endpoint for getting permissions from github module.
   parameters:
     - $ref: '#/components/parameters/userIdParam'
     - $ref: '#/components/parameters/linkParam'
-    - $ref: '#/components/parameters/pageLimitParam'
-    - $ref: '#/components/parameters/pageNumberParam'
+    - $ref: '#/components/parameters/parentLinkParam'
   responses:
     '200':
       description: Success

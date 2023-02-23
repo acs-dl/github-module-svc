@@ -7,12 +7,7 @@ import (
 )
 
 func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPermission {
-	deployable := true
-	if permission.Type == data.Repository {
-		deployable = false
-	}
-
-	result := resources.UserPermission{
+	return resources.UserPermission{
 		Key: resources.Key{
 			ID:   strconv.Itoa(counter),
 			Type: resources.USER_PERMISSION,
@@ -29,12 +24,10 @@ func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPerm
 				Name:  data.Roles[permission.AccessLevel],
 				Value: permission.AccessLevel,
 			},
-			Deployable: deployable,
+			Deployable: permission.HasChild,
 			ExpiresAt:  permission.ExpiresAt,
 		},
 	}
-
-	return result
 }
 
 func NewUserPermissionList(permissions []data.Sub) []resources.UserPermission {
@@ -52,7 +45,6 @@ func NewUserPermissionListResponse(permissions []data.Sub) UserPermissionListRes
 }
 
 type UserPermissionListResponse struct {
-	Meta  Meta                       `json:"meta"`
 	Data  []resources.UserPermission `json:"data"`
 	Links *resources.Links           `json:"links"`
 }

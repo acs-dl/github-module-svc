@@ -1,7 +1,6 @@
 package processor
 
 import (
-	"fmt"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
@@ -35,13 +34,12 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 	}
 
 	for _, permission := range permissions {
-		fmt.Println(permission.Link, permission.Username, msg.Username, permission.Type)
 		isHere, _, err := p.githubClient.CheckUserFromApi(permission.Link, msg.Username, permission.Type)
 		if err != nil {
 			p.log.WithError(err).Errorf("failed to check user from API for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "some error while checking user from api")
 		}
-		fmt.Println("HERE: ", isHere)
+
 		if isHere == true {
 			err = p.githubClient.RemoveUserFromApi(permission.Link, permission.Username, permission.Type)
 			if err != nil {

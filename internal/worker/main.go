@@ -89,7 +89,7 @@ func (w *worker) processPermissions(_ context.Context) error {
 		return errors.Wrap(err, "failed to create permissions for subs")
 	}
 
-	err = w.checkParentLevel()
+	err = w.checkHasParent()
 	if err != nil {
 		w.logger.Infof("failed to check parent levels for subs")
 		return errors.Wrap(err, "failed to check parent levels for for subs")
@@ -200,7 +200,7 @@ func (w *worker) processNested(link string, parentId int64, parentLpath string) 
 	return nil
 }
 
-func (w *worker) checkParentLevel() error {
+func (w *worker) checkHasParent() error {
 	w.logger.Infof("started checking parent levels for subs")
 
 	users, err := w.usersQ.Select()
@@ -228,6 +228,15 @@ func (w *worker) checkParentLevel() error {
 		w.logger.Infof("found `%v` permissions for user `%s`", len(permissions), user.Username)
 		for _, permission := range permissions {
 			if permission.ParentId == nil {
+				err = w.permissionsQ.UpdateHasParent(data.Permission{
+					HasParent: false,
+					GithubId:  permission.GithubId,
+					Link:      permission.Link,
+				})
+				if err != nil {
+					w.logger.Errorf("failed to update parent level")
+					return errors.Wrap(err, "failed to update parent level")
+				}
 				continue
 			}
 
@@ -236,16 +245,36 @@ func (w *worker) checkParentLevel() error {
 				w.logger.Errorf("failed to get parent permission")
 				return errors.Wrap(err, "failed to get parent permission")
 			}
+
 			if parentPermission == nil {
 				//suppose that it means: that user is not in parent repo only in lower level
+				err = w.permissionsQ.UpdateHasParent(data.Permission{
+					HasParent: false,
+					GithubId:  permission.GithubId,
+					Link:      permission.Link,
+				})
+				if err != nil {
+					w.logger.Errorf("failed to update parent level")
+					return errors.Wrap(err, "failed to update parent level")
+				}
 				continue
 			}
 
-			if permission.AccessLevel == parentPermission.AccessLevel {
-				err = w.permissionsQ.UpdateParentLevel(data.Permission{
-					ParentLevel: true,
-					GithubId:    permission.GithubId,
-					Link:        permission.Link,
+			if permission.AccessLevel != parentPermission.AccessLevel {
+				err = w.permissionsQ.UpdateHasParent(data.Permission{
+					HasParent: false,
+					GithubId:  permission.GithubId,
+					Link:      permission.Link,
+				})
+				if err != nil {
+					w.logger.Errorf("failed to update parent level")
+					return errors.Wrap(err, "failed to update parent level")
+				}
+
+				err = w.permissionsQ.UpdateHasChild(data.Permission{
+					HasChild: true,
+					GithubId: parentPermission.GithubId,
+					Link:     parentPermission.Link,
 				})
 				if err != nil {
 					w.logger.Errorf("failed to update parent level")

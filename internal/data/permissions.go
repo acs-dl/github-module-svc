@@ -9,7 +9,8 @@ type Permissions interface {
 	Upsert(permission Permission) error
 	Update(user Permission) error
 	UpdateUserId(permission Permission) error
-	UpdateParentLevel(permission Permission) error
+	UpdateHasParent(permission Permission) error
+	UpdateHasChild(permission Permission) error
 	Delete(githubId int64, typeTo, link string) error
 
 	JoinsModule() Permissions
@@ -28,7 +29,8 @@ type Permission struct {
 	Username    string    `json:"login" db:"username" structs:"username"`
 	GithubId    int64     `json:"id" db:"github_id" structs:"github_id"`
 	AccessLevel string    `json:"role_name" db:"access_level" structs:"access_level"`
-	ParentLevel bool      `json:"-" db:"parent_level" structs:"-"`
+	HasParent   bool      `json:"-" db:"has_parent" structs:"-"`
+	HasChild    bool      `json:"-" db:"has_child" structs:"-"`
 	Link        string    `json:"link" db:"link" structs:"link"`
 	Type        string    `json:"type" db:"type" structs:"type"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at" structs:"created_at"`

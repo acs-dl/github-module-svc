@@ -178,7 +178,7 @@ func (q *SubsQ) OrderBy(columns ...string) data.Subs {
 
 func (q *SubsQ) WithPermissions() data.Subs {
 	q.sql = sq.Select().Columns(subsColumns...).Column(fmt.Sprintf("nlevel(%s.lpath) as level", subsTableName)).
-		Columns(permissionsTableName+".request_id", permissionsTableName+".user_id", permissionsTableName+".username", permissionsTableName+".github_id", permissionsTableName+".access_level").
+		Columns(permissionsTableName+".request_id", permissionsTableName+".user_id", permissionsTableName+".username", permissionsTableName+".github_id", permissionsTableName+".access_level", permissionsTableName+".has_child").
 		From(subsTableName).
 		LeftJoin(fmt.Sprint(permissionsTableName, " ON ", permissionsTableName, ".link = ", subsTableName, ".link")).
 		Where(sq.NotEq{permissionsTableName + ".request_id": nil})
@@ -203,8 +203,8 @@ func (q *SubsQ) SearchBy(search string) data.Subs {
 	return q
 }
 
-func (q *SubsQ) FilterByParentLevel(parentLevel bool) data.Subs {
-	q.sql = q.sql.Where(sq.Eq{permissionsTableName + ".parent_level": parentLevel})
+func (q *SubsQ) FilterByHasParent(HasParent bool) data.Subs {
+	q.sql = q.sql.Where(sq.Eq{permissionsTableName + ".has_parent": HasParent})
 
 	return q
 }
@@ -217,8 +217,7 @@ func (q *SubsQ) Count() data.Subs {
 
 func (q *SubsQ) GetTotalCount() (int64, error) {
 	var count int64
-	stmt, args, _ := q.sql.ToSql()
-	fmt.Println(stmt, args)
+
 	err := q.db.Get(&count, q.sql)
 
 	return count, err
