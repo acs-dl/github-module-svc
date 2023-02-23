@@ -54,7 +54,8 @@ func GetPermissions(w http.ResponseWriter, r *http.Request) {
 		link = *request.Link
 		parentIds = nil
 
-		statement = SubsQ(r).WithPermissions().FilterByUserIds(userIds...).SearchBy(link)
+		statement = SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
+			FilterByHasParent(false).SearchBy(link)
 	}
 
 	permissions, err := statement.Select()
