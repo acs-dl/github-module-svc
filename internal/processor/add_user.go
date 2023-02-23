@@ -43,13 +43,14 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 
 	permission.UserId = &userId
 	permission.RequestId = msg.RequestId
+	permission.CreatedAt = time.Now()
 
 	err = p.managerQ.Transaction(func() error {
 		if err = p.usersQ.Upsert(data.User{
 			Id:        &userId,
 			Username:  permission.Username,
 			GithubId:  permission.GithubId,
-			CreatedAt: time.Now(),
+			CreatedAt: permission.CreatedAt,
 			AvatarUrl: permission.AvatarUrl,
 		}); err != nil {
 			p.log.WithError(err).Errorf("failed to creat user in user db for message action with id `%s`", msg.RequestId)
@@ -72,6 +73,12 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to make add user transaction for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to make add user transaction")
+	}
+
+	err = p.sendUsers(msg.RequestId, permission.CreatedAt)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to publish users for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to publish users")
 	}
 
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)

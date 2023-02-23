@@ -7,6 +7,7 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"strings"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"gitlab.com/distributed_lab/kit/pgdb"
@@ -35,11 +36,16 @@ func (q *UsersQ) New() data.Users {
 func (q *UsersQ) Upsert(user data.User) error {
 	clauses := structs.Map(user)
 
-	stmt := "ON CONFLICT (github_id) DO UPDATE SET created_at = CURRENT_TIMESTAMP"
+	updateQuery := sq.Update(" ").
+		Set("created_at", user.CreatedAt)
+
 	if user.Id != nil {
-		stmt = fmt.Sprintf("ON CONFLICT (github_id) DO UPDATE SET created_at = CURRENT_TIMESTAMP, id = %d", *user.Id)
+		updateQuery = updateQuery.Set("id", *user.Id)
 	}
-	query := sq.Insert(usersTableName).SetMap(clauses).Suffix(stmt)
+
+	updateStmt, args := updateQuery.MustSql()
+
+	query := sq.Insert(usersTableName).SetMap(clauses).Suffix("ON CONFLICT (github_id) DO "+updateStmt, args...)
 
 	return q.db.Exec(query)
 }
@@ -100,13 +106,16 @@ func (q *UsersQ) Delete(githubId int64) error {
 	return nil
 }
 
-func (q *UsersQ) FilterByIds(ids ...*int64) data.Users {
-	stmt := sq.Eq{usersTableName + ".id": nil}
-	if ids == nil {
-		stmt = sq.Eq{usersTableName + ".id": ids}
-	}
+func (q *UsersQ) FilterById(id *int64) data.Users {
+	stmt := sq.Eq{usersTableName + ".id": id}
 
 	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
+func (q *UsersQ) FilterByTime(time time.Time) data.Users {
+	q.sql = q.sql.Where(sq.Gt{usersTableName + ".created_at": time})
 
 	return q
 }
@@ -155,4 +164,10 @@ func (q *UsersQ) GetTotalCount() (int64, error) {
 	err := q.db.Get(&count, q.sql)
 
 	return count, err
+}
+
+func (q *UsersQ) ResetFilters() data.Users {
+	q.sql = selectedUsersTable
+
+	return q
 }

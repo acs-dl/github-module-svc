@@ -59,6 +59,28 @@ func (p *processor) handleRemoveUserAction(msg data.ModulePayload) error {
 			p.log.WithError(err).Errorf("failed to delete user from db for message action with id `%s`", msg.RequestId)
 		}
 
+		permissions, err := p.permissionsQ.FilterByGithubIds(*githubId).Select()
+		if err != nil {
+			p.log.WithError(err).Errorf("failed to select permissions by github id `%d` for message action with id `%s`", *githubId, msg.RequestId)
+			return errors.Wrap(err, "failed to select permissions")
+		}
+
+		if len(permissions) == 0 {
+			err = p.usersQ.Delete(*githubId)
+			if err != nil {
+				p.log.WithError(err).Errorf("failed to delete user by telegram id `%d` for message action with id `%s`", *githubId, msg.RequestId)
+				return errors.Wrap(err, "failed to delete user")
+			}
+
+			if dbUser.Id == nil {
+				err = p.sendDeleteUser(msg.RequestId, *dbUser)
+				if err != nil {
+					p.log.WithError(err).Errorf("failed to publish delete user for message action with id `%s`", msg.RequestId)
+					return errors.Wrap(err, "failed to publish delete user")
+				}
+			}
+		}
+
 		return nil
 	})
 	if err != nil {

@@ -39,6 +39,8 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "some error while getting users from api")
 	}
 
+	borderTime := time.Now()
+
 	for _, user := range users {
 		//api doesn't return role for organization members
 		if msg.Type == data.Organization {
@@ -60,18 +62,19 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				CreatedAt: time.Now(),
 				AvatarUrl: user.AvatarUrl,
 			}); err != nil {
-				p.log.WithError(err).Errorf("failed to creat user in user db for message action with id `%s`", msg.RequestId)
+				p.log.WithError(err).Errorf("failed to create user in user db for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to create user in user db")
 			}
+
+			p.usersQ.ResetFilters()
 
 			usrDb, err := p.usersQ.GetByUsername(user.Username)
 			if err != nil {
 				p.log.WithError(err).Errorf("failed to get user form user db for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to get user from user db")
 			}
-
 			if usrDb == nil {
-				p.log.Errorf("no user with such username for message action with id `%s`", msg.RequestId)
+				p.log.Errorf("no user with such username `%s` for message action with id `%s`", user.Username, msg.RequestId)
 				return errors.Wrap(err, "no user with such username")
 			}
 
@@ -92,6 +95,12 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 			p.log.WithError(err).Errorf("failed to make get users transaction for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to make get users transaction")
 		}
+	}
+
+	err = p.sendUsers(msg.RequestId, borderTime)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to publish users for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to publish users")
 	}
 
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)

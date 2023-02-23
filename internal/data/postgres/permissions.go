@@ -93,11 +93,12 @@ func (q *PermissionsQ) Select() ([]data.Permission, error) {
 }
 
 func (q *PermissionsQ) Upsert(permission data.Permission) error {
-	updUsername := fmt.Sprintf("username = '%s'", permission.Username)
-	updLevel := fmt.Sprintf("access_level = '%s'", permission.AccessLevel)
+	updateStmt, args := sq.Update(" ").
+		Set("username", permission.Username).
+		Set("access_level", permission.AccessLevel).MustSql()
 
 	query := sq.Insert(permissionsTableName).SetMap(structs.Map(permission)).
-		Suffix(fmt.Sprintf("ON CONFLICT (github_id, link) DO UPDATE SET %s, %s", updUsername, updLevel))
+		Suffix("ON CONFLICT (github_id, link) DO "+updateStmt, args...)
 
 	return q.db.Exec(query)
 }

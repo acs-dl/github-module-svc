@@ -36,14 +36,16 @@ func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "some error while getting user id from api")
 	}
 
+	user := data.User{
+		Id:        &userId,
+		Username:  userApi.Username,
+		GithubId:  userApi.GithubId,
+		AvatarUrl: userApi.AvatarUrl,
+		CreatedAt: time.Now(),
+	}
+
 	err = p.managerQ.Transaction(func() error {
-		if err = p.usersQ.Upsert(data.User{
-			Id:        &userId,
-			Username:  userApi.Username,
-			GithubId:  userApi.GithubId,
-			AvatarUrl: userApi.AvatarUrl,
-			CreatedAt: time.Now(),
-		}); err != nil {
+		if err = p.usersQ.Upsert(user); err != nil {
 			p.log.WithError(err).Errorf("failed to upsert user in user db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to upsert user in user db")
 		}
@@ -58,6 +60,12 @@ func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to make add user transaction for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to make add user transaction")
+	}
+
+	err = p.sendDeleteUser(msg.RequestId, user)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to publish delete user for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to publish delete user")
 	}
 
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)

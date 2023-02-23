@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
@@ -13,7 +12,6 @@ import (
 func GetPermissions(w http.ResponseWriter, r *http.Request) {
 	request, err := requests.NewGetPermissionsRequest(r)
 	if err != nil {
-		fmt.Println("aboba")
 		Log(r).WithError(err).Error("bad request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
