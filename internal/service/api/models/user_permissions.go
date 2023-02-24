@@ -17,7 +17,6 @@ func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPerm
 			ModuleId: permission.GithubId,
 			Path:     permission.Path,
 			UserId:   permission.UserId,
-			Level:    permission.Nlevel,
 			Type:     permission.Type,
 			Link:     permission.Link,
 			AccessLevel: resources.AccessLevel{
@@ -45,6 +44,7 @@ func NewUserPermissionListResponse(permissions []data.Sub) UserPermissionListRes
 }
 
 type UserPermissionListResponse struct {
+	Meta  Meta                       `json:"meta"`
 	Data  []resources.UserPermission `json:"data"`
 	Links *resources.Links           `json:"links"`
 }

@@ -35,7 +35,7 @@ type User struct {
 	Username  string    `json:"login" db:"username" structs:"username"`
 	GithubId  int64     `json:"id" db:"github_id" structs:"github_id"`
 	AvatarUrl string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
-	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"created_at"`
+	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"-"`
 }
 
 type UnverifiedUser struct {

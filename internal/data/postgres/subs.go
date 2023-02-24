@@ -177,7 +177,7 @@ func (q *SubsQ) OrderBy(columns ...string) data.Subs {
 }
 
 func (q *SubsQ) WithPermissions() data.Subs {
-	q.sql = sq.Select().Columns(subsColumns...).Column(fmt.Sprintf("nlevel(%s.lpath) as level", subsTableName)).
+	q.sql = sq.Select().Columns(subsColumns...).
 		Columns(permissionsTableName+".request_id", permissionsTableName+".user_id", permissionsTableName+".username", permissionsTableName+".github_id", permissionsTableName+".access_level", permissionsTableName+".has_child").
 		From(subsTableName).
 		LeftJoin(fmt.Sprint(permissionsTableName, " ON ", permissionsTableName, ".link = ", subsTableName, ".link")).
