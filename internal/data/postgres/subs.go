@@ -198,7 +198,7 @@ func (q *SubsQ) SearchBy(search string) data.Subs {
 	search = strings.Replace(search, " ", "%", -1)
 	search = fmt.Sprint("%", search, "%")
 
-	q.sql = q.sql.Where(sq.ILike{"subs.link": search})
+	q.sql = q.sql.Where(sq.ILike{"subs.path": search})
 
 	return q
 }
