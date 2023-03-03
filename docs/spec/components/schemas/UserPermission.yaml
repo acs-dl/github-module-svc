@@ -14,7 +14,6 @@ allOf:
           - path
           - access_level
           - deployable
-          - expires_at
         properties:
           username:
             type: string
