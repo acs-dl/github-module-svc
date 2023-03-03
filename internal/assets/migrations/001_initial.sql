@@ -30,7 +30,7 @@ INSERT INTO links (link) VALUES ('acstestapi');
 
 CREATE INDEX IF NOT EXISTS links_link_idx ON links(link);
 
-CREATE EXTENSION ltree;
+CREATE EXTENSION IF NOT EXISTS ltree;
 
 CREATE TABLE IF NOT EXISTS subs (
     id BIGINT PRIMARY KEY,
@@ -96,3 +96,5 @@ DROP INDEX IF EXISTS permissions_link_idx;
 
 DROP INDEX IF EXISTS lpath_gist_idx;
 DROP INDEX IF EXISTS lpath_btree_idx;
+
+DROP EXTENSION IF EXISTS ltree;
