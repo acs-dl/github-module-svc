@@ -44,6 +44,5 @@ type Sub struct {
 	Type        string `json:"type" db:"subs_type" structs:"type"`
 	ParentId    *int64 `json:"parent_id" db:"parent_id" structs:"parent_id"`
 	Lpath       string `json:"lpath" db:"lpath" structs:"lpath"`
-	Nlevel      int64  `json:"-" db:"level" structs:"-"`
 	*Permission `structs:",omitempty"`
 }

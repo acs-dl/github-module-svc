@@ -177,8 +177,8 @@ func (q *SubsQ) OrderBy(columns ...string) data.Subs {
 }
 
 func (q *SubsQ) WithPermissions() data.Subs {
-	q.sql = sq.Select().Columns(subsColumns...).Column(fmt.Sprintf("nlevel(%s.lpath) as level", subsTableName)).
-		Columns(permissionsTableName+".request_id", permissionsTableName+".user_id", permissionsTableName+".username", permissionsTableName+".github_id", permissionsTableName+".access_level", permissionsTableName+".has_child").
+	q.sql = sq.Select().Columns(subsColumns...).
+		Columns(permissionsTableName+".request_id", permissionsTableName+".user_id", permissionsTableName+".username", permissionsTableName+".github_id", permissionsTableName+".access_level", permissionsTableName+".has_child", permissionsTableName+".expires_at").
 		From(subsTableName).
 		LeftJoin(fmt.Sprint(permissionsTableName, " ON ", permissionsTableName, ".link = ", subsTableName, ".link")).
 		Where(sq.NotEq{permissionsTableName + ".request_id": nil})
@@ -198,7 +198,7 @@ func (q *SubsQ) SearchBy(search string) data.Subs {
 	search = strings.Replace(search, " ", "%", -1)
 	search = fmt.Sprint("%", search, "%")
 
-	q.sql = q.sql.Where(sq.ILike{"subs.link": search})
+	q.sql = q.sql.Where(sq.ILike{"subs.path": search})
 
 	return q
 }

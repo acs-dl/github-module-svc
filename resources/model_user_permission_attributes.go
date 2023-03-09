@@ -13,9 +13,7 @@ type UserPermissionAttributes struct {
 	// indicates whether element have nested object
 	Deployable bool `json:"deployable"`
 	// shows when permission is expired
-	ExpiresAt time.Time `json:"expires_at"`
-	// link level in tree
-	Level int64 `json:"level"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// full path to repo for which was given access
 	Link string `json:"link"`
 	// user id from gitlab

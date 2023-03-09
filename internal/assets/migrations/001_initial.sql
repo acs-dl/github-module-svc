@@ -13,10 +13,12 @@ CREATE TABLE IF NOT EXISTS users (
     id BIGINT UNIQUE,
     username TEXT NOT NULL UNIQUE,
     avatar_url TEXT NOT NULL,
-    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS users_idx ON users(id, username, github_id);
+CREATE INDEX IF NOT EXISTS users_id_idx ON users(id);
+CREATE INDEX IF NOT EXISTS users_username_idx ON users(username);
+CREATE INDEX IF NOT EXISTS users_githubId_idx ON users(github_id);
 
 CREATE TABLE IF NOT EXISTS links (
     id SERIAL PRIMARY KEY,
@@ -28,7 +30,7 @@ INSERT INTO links (link) VALUES ('acstestapi');
 
 CREATE INDEX IF NOT EXISTS links_link_idx ON links(link);
 
-CREATE EXTENSION ltree;
+CREATE EXTENSION IF NOT EXISTS ltree;
 
 CREATE TABLE IF NOT EXISTS subs (
     id BIGINT PRIMARY KEY,
@@ -43,7 +45,9 @@ CREATE TABLE IF NOT EXISTS subs (
 
 CREATE INDEX IF NOT EXISTS lpath_gist_idx ON subs USING GIST (lpath);
 CREATE INDEX IF NOT EXISTS lpath_btree_idx ON subs USING BTREE (lpath);
-CREATE INDEX IF NOT EXISTS subs_idx ON subs(id, link, parent_id);
+CREATE INDEX IF NOT EXISTS subs_id_idx ON subs(id);
+CREATE INDEX IF NOT EXISTS subs_link_idx ON subs(link);
+CREATE INDEX IF NOT EXISTS subs_parentId_idx ON subs(parent_id);
 
 CREATE TABLE IF NOT EXISTS permissions (
     request_id TEXT NOT NULL,
@@ -64,7 +68,9 @@ CREATE TABLE IF NOT EXISTS permissions (
     FOREIGN KEY(link) REFERENCES subs(link) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS permissions_idx ON permissions(user_id, github_id, link);
+CREATE INDEX IF NOT EXISTS permissions_userId_idx ON permissions(user_id);
+CREATE INDEX IF NOT EXISTS permissions_githubId_idx ON permissions(github_id);
+CREATE INDEX IF NOT EXISTS permissions_link_idx ON permissions(link);
 
 -- +migrate Down
 
@@ -74,9 +80,21 @@ DROP TABLE IF EXISTS links;
 DROP TABLE IF EXISTS subs;
 DROP TABLE IF EXISTS users;
 
-DROP INDEX IF EXISTS users_idx;
+DROP INDEX IF EXISTS users_id_idx;
+DROP INDEX IF EXISTS users_username_idx;
+DROP INDEX IF EXISTS users_gitlabId_idx;
+
 DROP INDEX IF EXISTS links_link_idx;
-DROP INDEX IF EXISTS subs_idx;
-DROP INDEX IF EXISTS permissions_idx;
+
+DROP INDEX IF EXISTS subs_id_idx;
+DROP INDEX IF EXISTS subs_link_idx;
+DROP INDEX IF EXISTS subs_parentId_idx;
+
+DROP INDEX IF EXISTS permissions_userId_idx;
+DROP INDEX IF EXISTS permissions_gitlabId_idx;
+DROP INDEX IF EXISTS permissions_link_idx;
+
 DROP INDEX IF EXISTS lpath_gist_idx;
 DROP INDEX IF EXISTS lpath_btree_idx;
+
+DROP EXTENSION IF EXISTS ltree;

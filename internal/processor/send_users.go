@@ -2,6 +2,7 @@ package processor
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
@@ -72,7 +73,7 @@ func createUnverifiedUserFromModuleUser(user data.User) data.UnverifiedUser {
 	return data.UnverifiedUser{
 		CreatedAt: user.CreatedAt,
 		Module:    data.ModuleName,
-		ModuleId:  user.GithubId,
+		ModuleId:  fmt.Sprintf("%d", user.GithubId),
 		Email:     nil,
 		Name:      nil,
 		Phone:     nil,

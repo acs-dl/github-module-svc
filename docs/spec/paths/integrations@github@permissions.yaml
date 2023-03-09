@@ -21,6 +21,13 @@ get:
                 items:
                   type: object
                   $ref: '#/components/schemas/UserPermission'
+              meta:
+                type: object
+                properties:
+                  total_count:
+                    type: integer
+                    format: int64
+                    description: Total number of permissions
     '400':
       description: Bad request.
     '500':

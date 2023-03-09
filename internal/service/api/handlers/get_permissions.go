@@ -27,6 +27,9 @@ func GetPermissions(w http.ResponseWriter, r *http.Request) {
 	statement := SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
 		FilterByHasParent(false).FilterByParentIds(parentIds...)
 
+	totalCount := SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
+		FilterByHasParent(false).FilterByParentIds(parentIds...)
+
 	if request.ParentLink != nil {
 		permission, err := SubsQ(r).FilterByLinks(*request.ParentLink).Get()
 		if err != nil {
@@ -45,6 +48,8 @@ func GetPermissions(w http.ResponseWriter, r *http.Request) {
 
 		statement = SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
 			FilterByHasParent(false).FilterByParentIds(parentIds...)
+		totalCount = SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
+			FilterByHasParent(false).FilterByParentIds(parentIds...)
 	}
 
 	var link = ""
@@ -53,15 +58,28 @@ func GetPermissions(w http.ResponseWriter, r *http.Request) {
 		parentIds = nil
 
 		statement = SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
-			FilterByHasParent(false).SearchBy(link)
+			SearchBy(link)
+		totalCount = SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
+			SearchBy(link)
 	}
 
-	permissions, err := statement.Select()
+	permissions, err := statement.Page(request.OffsetPageParams).Select()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to get permissions")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	ape.Render(w, models.NewUserPermissionListResponse(permissions))
+	amount, err := totalCount.GetTotalCount()
+	if err != nil {
+		Log(r).WithError(err).Error("failed to get total count")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	response := models.NewUserPermissionListResponse(permissions)
+	response.Meta.TotalCount = amount
+	response.Links = data.GetOffsetLinksForPGParams(r, request.OffsetPageParams)
+
+	ape.Render(w, response)
 }

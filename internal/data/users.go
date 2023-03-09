@@ -35,13 +35,13 @@ type User struct {
 	Username  string    `json:"login" db:"username" structs:"username"`
 	GithubId  int64     `json:"id" db:"github_id" structs:"github_id"`
 	AvatarUrl string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
-	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"created_at"`
+	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"-"`
 }
 
 type UnverifiedUser struct {
 	CreatedAt time.Time `json:"created_at"`
 	Module    string    `json:"module"`
-	ModuleId  int64     `json:"module_id"`
+	ModuleId  string    `json:"module_id"`
 	Email     *string   `json:"email,omitempty"`
 	Name      *string   `json:"name,omitempty"`
 	Phone     *string   `json:"phone,omitempty"`
