@@ -22,14 +22,14 @@ func GetUnverifiedUsers(w http.ResponseWriter, r *http.Request) {
 		username = *request.Username
 	}
 
-	totalCount, err := UsersQ(r).Count().FilterByIds(nil).SearchBy(username).GetTotalCount()
+	totalCount, err := UsersQ(r).Count().FilterById(nil).SearchBy(username).GetTotalCount()
 	if err != nil {
 		Log(r).WithError(err).Errorf("failed to select to get total count from db")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
 
-	users, err := UsersQ(r).SearchBy(username).FilterByIds(nil).Page(request.OffsetPageParams).Select()
+	users, err := UsersQ(r).SearchBy(username).FilterById(nil).Page(request.OffsetPageParams).Select()
 	if err != nil {
 		Log(r).WithError(err).Errorf("failed to select unverified users from db")
 		ape.RenderErr(w, problems.InternalError())

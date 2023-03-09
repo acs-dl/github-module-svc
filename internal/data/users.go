@@ -21,10 +21,13 @@ type Users interface {
 	GetByUsername(username string) (*User, error)
 	GetByGithubId(githubId int64) (*User, error)
 
-	FilterByIds(ids ...*int64) Users
+	FilterByTime(time time.Time) Users
+	FilterById(id *int64) Users
 	SearchBy(search string) Users
 
 	Page(pageParams pgdb.OffsetPageParams) Users
+
+	ResetFilters() Users
 }
 
 type User struct {
@@ -33,4 +36,14 @@ type User struct {
 	GithubId  int64     `json:"id" db:"github_id" structs:"github_id"`
 	AvatarUrl string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
 	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"created_at"`
+}
+
+type UnverifiedUser struct {
+	CreatedAt time.Time `json:"created_at"`
+	Module    string    `json:"module"`
+	ModuleId  int64     `json:"module_id"`
+	Email     *string   `json:"email,omitempty"`
+	Name      *string   `json:"name,omitempty"`
+	Phone     *string   `json:"phone,omitempty"`
+	Username  *string   `json:"username,omitempty"`
 }

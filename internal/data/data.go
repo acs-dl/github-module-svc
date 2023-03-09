@@ -33,6 +33,11 @@ type ModulePayload struct {
 	Type        string `json:"type"`
 }
 
+type UnverifiedPayload struct {
+	Action string           `json:"action"`
+	Users  []UnverifiedUser `json:"users"`
+}
+
 var Roles = map[string]string{
 	"read":     "Read",
 	"triage":   "Triage",
