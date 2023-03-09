@@ -68,6 +68,7 @@ func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to make update user transaction")
 	}
 
+	p.resetFilters()
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
 }

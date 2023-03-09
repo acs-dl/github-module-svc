@@ -87,6 +87,7 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 		}
 	}
 
+	p.resetFilters()
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
 }
