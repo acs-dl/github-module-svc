@@ -21,6 +21,8 @@ type Permissions interface {
 	FilterByGithubIds(githubIds ...int64) Permissions
 	FilterByUsernames(usernames ...string) Permissions
 	FilterByLinks(links ...string) Permissions
+
+	ResetFilters() Permissions
 }
 
 type Permission struct {

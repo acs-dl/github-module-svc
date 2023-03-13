@@ -162,3 +162,9 @@ func (q *PermissionsQ) FilterByLinks(links ...string) data.Permissions {
 
 	return q
 }
+
+func (q *PermissionsQ) ResetFilters() data.Permissions {
+	q.sql = sq.Select(permissionsColumns...).From(permissionsTableName)
+
+	return q
+}
