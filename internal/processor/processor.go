@@ -35,6 +35,7 @@ type processor struct {
 	log          *logan.Entry
 	githubClient github.GithubClient
 	permissionsQ data.Permissions
+	subsQ        data.Subs
 	usersQ       data.Users
 	managerQ     *manager.Manager
 	sender       *sender.Sender
@@ -54,6 +55,7 @@ func NewProcessor(cfg config.Config) Processor {
 		log:          cfg.Log().WithField("service", serviceName),
 		githubClient: github.NewGithub(cfg.Github().Token),
 		permissionsQ: postgres.NewPermissionsQ(cfg.DB()),
+		subsQ:        postgres.NewSubsQ(cfg.DB()),
 		usersQ:       postgres.NewUsersQ(cfg.DB()),
 		managerQ:     manager.NewManager(cfg.DB()),
 		sender:       sender.NewSender(cfg),

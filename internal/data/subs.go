@@ -13,6 +13,7 @@ type Subs interface {
 	Get() (*Sub, error)
 
 	FilterByParentIds(parentIds ...int64) Subs
+	FilterByParentLinks(parentIds ...string) Subs
 	FilterByLevel(lpath ...string) Subs
 	FilterByLowerLevel(parentLpath string) Subs
 	FilterByHigherLevel(parentLpath string) Subs

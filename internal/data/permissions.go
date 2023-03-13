@@ -11,6 +11,7 @@ type Permissions interface {
 	UpdateUserId(permission Permission) error
 	UpdateHasParent(permission Permission) error
 	UpdateHasChild(permission Permission) error
+	UpdateParentLink(permission Permission) error
 	Delete(githubId int64, typeTo, link string) error
 
 	JoinsModule() Permissions
@@ -21,6 +22,9 @@ type Permissions interface {
 	FilterByGithubIds(githubIds ...int64) Permissions
 	FilterByUsernames(usernames ...string) Permissions
 	FilterByLinks(links ...string) Permissions
+	FilterByTime(time time.Time) Permissions
+	FilterByParentLinks(parentLinks ...string) Permissions
+	FilterByHasParent(hasParent bool) Permissions
 
 	ResetFilters() Permissions
 }
@@ -35,6 +39,7 @@ type Permission struct {
 	HasChild    bool      `json:"-" db:"has_child" structs:"-"`
 	Link        string    `json:"link" db:"link" structs:"link"`
 	Type        string    `json:"type" db:"type" structs:"type"`
+	ParentLink  *string   `json:"-" db:"parent_link" structs:"parent_link"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at" structs:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at" structs:"-"`
 	ExpiresAt   time.Time `json:"expires_at" db:"expires_at" structs:"expires_at"`

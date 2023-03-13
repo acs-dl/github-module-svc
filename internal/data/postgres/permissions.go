@@ -8,6 +8,7 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/kit/pgdb"
 	"gitlab.com/distributed_lab/logan/v3/errors"
+	"time"
 )
 
 const permissionsTableName = "permissions"
@@ -17,7 +18,16 @@ type PermissionsQ struct {
 	sql sq.SelectBuilder
 }
 
-var permissionsColumns = []string{"permissions.request_id", "permissions.user_id", "permissions.username", "permissions.github_id", "permissions.link", "permissions.access_level", "permissions.type"}
+var permissionsColumns = []string{
+	"permissions.request_id",
+	"permissions.user_id",
+	"permissions.username",
+	"permissions.github_id",
+	"permissions.link",
+	"permissions.access_level",
+	"permissions.type",
+	"permissions.parent_link",
+}
 
 func NewPermissionsQ(db *pgdb.DB) data.Permissions {
 	return &PermissionsQ{
@@ -67,6 +77,17 @@ func (q *PermissionsQ) UpdateHasParent(permission data.Permission) error {
 	return q.db.Exec(query)
 }
 
+func (q *PermissionsQ) UpdateParentLink(permission data.Permission) error {
+	query := sq.Update(permissionsTableName).
+		Set("parent_link", permission.ParentLink).
+		Where(sq.Eq{
+			"github_id": permission.GithubId,
+			"link":      permission.Link,
+		})
+
+	return q.db.Exec(query)
+}
+
 func (q *PermissionsQ) UpdateHasChild(permission data.Permission) error {
 	query := sq.Update(permissionsTableName).
 		Set("has_child", permission.HasChild).
@@ -94,6 +115,7 @@ func (q *PermissionsQ) Select() ([]data.Permission, error) {
 
 func (q *PermissionsQ) Upsert(permission data.Permission) error {
 	updateStmt, args := sq.Update(" ").
+		Set("updated_at", time.Now()).
 		Set("username", permission.Username).
 		Set("access_level", permission.AccessLevel).MustSql()
 
@@ -159,6 +181,29 @@ func (q *PermissionsQ) FilterByLinks(links ...string) data.Permissions {
 	stmt := sq.Eq{permissionsTableName + ".link": links}
 
 	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByParentLinks(parentLinks ...string) data.Permissions {
+	stmt := sq.Eq{permissionsTableName + ".parent_link": parentLinks}
+	if len(parentLinks) == 0 {
+		stmt = sq.Eq{permissionsTableName + ".parent_link": nil}
+	}
+
+	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByHasParent(hasParent bool) data.Permissions {
+	q.sql = q.sql.Where(sq.Eq{permissionsTableName + ".has_parent": hasParent})
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByTime(time time.Time) data.Permissions {
+	q.sql = q.sql.Where(sq.Gt{permissionsTableName + ".updated_at": time})
 
 	return q
 }

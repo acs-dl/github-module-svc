@@ -102,6 +102,17 @@ func (q *SubsQ) FilterByParentIds(parentIds ...int64) data.Subs {
 	return q
 }
 
+func (q *SubsQ) FilterByParentLinks(parentLinks ...string) data.Subs {
+	stmt := sq.Eq{permissionsTableName + ".parent_link": parentLinks}
+	if len(parentLinks) == 0 {
+		stmt = sq.Eq{permissionsTableName + ".parent_link": nil}
+	}
+
+	q.sql = q.sql.Where(stmt)
+
+	return q
+}
+
 func (q *SubsQ) FilterByLinks(links ...string) data.Subs {
 	stmt := sq.Eq{subsTableName + ".link": links}
 
@@ -178,7 +189,11 @@ func (q *SubsQ) OrderBy(columns ...string) data.Subs {
 
 func (q *SubsQ) WithPermissions() data.Subs {
 	q.sql = sq.Select().Columns(subsColumns...).
-		Columns(permissionsTableName+".request_id", permissionsTableName+".user_id", permissionsTableName+".username", permissionsTableName+".github_id", permissionsTableName+".access_level", permissionsTableName+".has_child", permissionsTableName+".expires_at").
+		Columns(
+			permissionsTableName+".request_id", permissionsTableName+".user_id",
+			permissionsTableName+".username", permissionsTableName+".github_id",
+			permissionsTableName+".access_level", permissionsTableName+".has_child",
+			permissionsTableName+".expires_at", permissionsTableName+".parent_link").
 		From(subsTableName).
 		LeftJoin(fmt.Sprint(permissionsTableName, " ON ", permissionsTableName, ".link = ", subsTableName, ".link")).
 		Where(sq.NotEq{permissionsTableName + ".request_id": nil})
