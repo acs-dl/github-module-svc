@@ -1,9 +1,10 @@
 package handlers
 
 import (
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/ape"
-	"net/http"
 )
 
 func GetInputs(w http.ResponseWriter, r *http.Request) {

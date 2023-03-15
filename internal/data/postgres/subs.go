@@ -3,12 +3,13 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/fatih/structs"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/kit/pgdb"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"strings"
 )
 
 const subsTableName = "subs"
@@ -19,7 +20,13 @@ type SubsQ struct {
 }
 
 var (
-	subsColumns       = []string{subsTableName + ".id", subsTableName + ".link as subs_link", subsTableName + ".path", subsTableName + ".lpath", subsTableName + ".type as subs_type", subsTableName + ".parent_id"}
+	subsColumns = []string{
+		subsTableName + ".id",
+		subsTableName + ".link as subs_link",
+		subsTableName + ".path",
+		subsTableName + ".type as subs_type",
+		subsTableName + ".parent_id",
+	}
 	selectedSubsTable = sq.Select(subsColumns...).From(subsTableName)
 )
 
@@ -57,12 +64,6 @@ func (q *SubsQ) Select() ([]data.Sub, error) {
 	return result, err
 }
 
-func (q *SubsQ) DistinctOn(column string) data.Subs {
-	q.sql = q.sql.Options(fmt.Sprintf("DISTINCT ON (%s)", column))
-
-	return q
-}
-
 func (q *SubsQ) Get() (*data.Sub, error) {
 	var result data.Sub
 
@@ -75,31 +76,25 @@ func (q *SubsQ) Get() (*data.Sub, error) {
 }
 
 func (q *SubsQ) Delete(subId int64, typeTo, link string) error {
-	query := sq.Delete(subsTableName).Where(
-		sq.Eq{"id": subId, "type": typeTo, "link": link})
+	var deleted []data.Response
 
-	result, err := q.db.ExecWithResult(query)
+	query := sq.Delete(subsTableName).
+		Where(sq.Eq{
+			"id":   subId,
+			"type": typeTo,
+			"link": link,
+		}).
+		Suffix("RETURNING *")
+
+	err := q.db.Select(&deleted, query)
 	if err != nil {
 		return err
 	}
-
-	affectedRows, _ := result.RowsAffected()
-	if affectedRows == 0 {
-		return errors.New("no sub with such data")
+	if len(deleted) == 0 {
+		return errors.Errorf("no rows with `%s` link", link)
 	}
 
 	return nil
-}
-
-func (q *SubsQ) FilterByParentIds(parentIds ...int64) data.Subs {
-	stmt := sq.Eq{subsTableName + ".parent_id": parentIds}
-	if len(parentIds) == 0 {
-		stmt = sq.Eq{subsTableName + ".parent_id": nil}
-	}
-
-	q.sql = q.sql.Where(stmt)
-
-	return q
 }
 
 func (q *SubsQ) FilterByParentLinks(parentLinks ...string) data.Subs {
@@ -145,38 +140,6 @@ func (q *SubsQ) FilterByGithubIds(githubIds ...int64) data.Subs {
 	stmt := sq.Eq{permissionsTableName + ".github_id": githubIds}
 
 	q.sql = q.sql.Where(stmt)
-
-	return q
-}
-
-func (q *SubsQ) ResetFilters() data.Subs {
-	q.sql = selectedSubsTable
-
-	return q
-}
-
-func (q *SubsQ) FilterByLevel(lpath ...string) data.Subs {
-	query := sq.Expr(fmt.Sprintf("subs.lpath ?? ARRAY[%s]::lquery[]", strings.Join(lpath, ",")))
-
-	q.sql = q.sql.Where(query).
-		OrderBy("subs.lpath").PlaceholderFormat(sq.Dollar)
-	return q
-}
-
-func (q *SubsQ) FilterByLowerLevel(parentLpath string) data.Subs {
-	q.sql = q.sql.Where(fmt.Sprintf("%s.lpath <@ '%s'", subsTableName, parentLpath))
-
-	return q
-}
-
-func (q *SubsQ) FilterExceptSelf(parentLpath string) data.Subs {
-	q.sql = q.sql.Where(fmt.Sprintf("%s.lpath <> '%s'", subsTableName, parentLpath))
-
-	return q
-}
-
-func (q *SubsQ) FilterByHigherLevel(parentLpath string) data.Subs {
-	q.sql = q.sql.Where(fmt.Sprintf("%s.lpath @> '%s'", subsTableName, parentLpath))
 
 	return q
 }

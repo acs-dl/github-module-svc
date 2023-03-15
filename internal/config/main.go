@@ -20,7 +20,6 @@ type Config interface {
 	// other config values
 	Github() *GithubCfg
 	Amqp() *AmqpData
-	Cache() *CacheData
 	JwtParams() *JwtCfg
 
 	// Registrator config for Core
@@ -38,9 +37,8 @@ type config struct {
 	// connectors
 
 	// other config values
-	gitlab      comfig.Once
+	github      comfig.Once
 	amqp        comfig.Once
-	cache       comfig.Once
 	registrator comfig.Once
 	jwtCfg      comfig.Once
 }

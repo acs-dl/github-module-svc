@@ -11,7 +11,7 @@ type GithubCfg struct {
 }
 
 func (c *config) Github() *GithubCfg {
-	return c.gitlab.Do(func() interface{} {
+	return c.github.Do(func() interface{} {
 		var config GithubCfg
 		err := figure.
 			Out(&config).

@@ -291,7 +291,7 @@ func runSafelyWithSuccess(ctx context.Context, runnerName string, runner func(co
 	return runner(ctx)
 }
 
-//RunEachMonth - runs `runner` right after the call and then at the begging of the next month at utc.
+// RunEachMonth - runs `runner` right after the call and then at the begging of the next month at utc.
 // In case of error or panic uses same logic as `UntilSuccess`.
 func RunEachMonth(
 	ctx context.Context,
@@ -314,7 +314,6 @@ func RunEachMonth(
 		}
 	}, minRetryPeriod, maxRetryPeriod)
 }
-
 
 func waitUntilNextMonthFirstDayMidnightUTC(ctx context.Context) {
 	now := time.Now().UTC()

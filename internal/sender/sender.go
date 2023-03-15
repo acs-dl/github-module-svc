@@ -2,6 +2,7 @@ package sender
 
 import (
 	"context"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 )
 

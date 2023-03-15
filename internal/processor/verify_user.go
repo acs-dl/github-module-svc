@@ -1,11 +1,12 @@
 package processor
 
 import (
+	"strconv"
+	"time"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"strconv"
-	"time"
 )
 
 func (p *processor) validateVerifyUser(msg data.ModulePayload) error {

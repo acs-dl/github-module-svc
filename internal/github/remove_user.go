@@ -2,9 +2,10 @@ package github
 
 import (
 	"fmt"
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
 
 func (g *github) RemoveUserFromApi(link, username, typeTo string) error {

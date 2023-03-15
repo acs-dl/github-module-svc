@@ -56,7 +56,7 @@ func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
 
 	err = p.managerQ.Transaction(func() error {
 		permission.Link = msg.Link
-		if err = p.permissionsQ.Update(*permission); err != nil {
+		if err = p.permissionsQ.UpdateUsernameAccessLevel(*permission); err != nil {
 			p.log.WithError(err).Errorf("failed to update user in permission db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to update user in permission db")
 		}

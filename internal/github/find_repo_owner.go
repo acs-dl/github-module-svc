@@ -3,8 +3,9 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
+
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (g *github) FindRepoOwner(link string) (string, error) {
