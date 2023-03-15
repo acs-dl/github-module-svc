@@ -76,7 +76,7 @@ func (q *SubsQ) Get() (*data.Sub, error) {
 }
 
 func (q *SubsQ) Delete(subId int64, typeTo, link string) error {
-	var deleted []data.Response
+	var deleted []data.Sub
 
 	query := sq.Delete(subsTableName).
 		Where(sq.Eq{

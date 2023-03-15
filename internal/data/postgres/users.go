@@ -89,7 +89,7 @@ func (q *UsersQ) GetByGithubId(githubId int64) (*data.User, error) {
 }
 
 func (q *UsersQ) Delete(githubId int64) error {
-	var deleted []data.Response
+	var deleted []data.User
 
 	query := sq.Delete(subsTableName).
 		Where(sq.Eq{

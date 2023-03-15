@@ -131,7 +131,7 @@ func (q *PermissionsQ) Get() (*data.Permission, error) {
 }
 
 func (q *PermissionsQ) Delete(githubId int64, typeTo, link string) error {
-	var deleted []data.Response
+	var deleted []data.Permission
 
 	query := sq.Delete(permissionsTableName).
 		Where(sq.Eq{
