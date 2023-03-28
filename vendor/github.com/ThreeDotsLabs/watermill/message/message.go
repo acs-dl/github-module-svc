@@ -133,12 +133,13 @@ func (m *Message) Nack() bool {
 // Acked returns channel which is closed when acknowledgement is sent.
 //
 // Usage:
-// 		select {
-//		case <-message.Acked():
-// 			// ack received
-//		case <-message.Nacked():
-//			// nack received
-//		}
+//
+//	select {
+//	case <-message.Acked():
+//		// ack received
+//	case <-message.Nacked():
+//		// nack received
+//	}
 func (m *Message) Acked() <-chan struct{} {
 	return m.ack
 }
@@ -146,12 +147,13 @@ func (m *Message) Acked() <-chan struct{} {
 // Nacked returns channel which is closed when negative acknowledgement is sent.
 //
 // Usage:
-// 		select {
-//		case <-message.Acked():
-// 			// ack received
-//		case <-message.Nacked():
-//			// nack received
-//		}
+//
+//	select {
+//	case <-message.Acked():
+//		// ack received
+//	case <-message.Nacked():
+//		// nack received
+//	}
 func (m *Message) Nacked() <-chan struct{} {
 	return m.noAck
 }

@@ -1,8 +1,9 @@
 package data
 
 import (
-	"gitlab.com/distributed_lab/kit/pgdb"
 	"time"
+
+	"gitlab.com/distributed_lab/kit/pgdb"
 )
 
 type Users interface {
@@ -21,13 +22,10 @@ type Users interface {
 	GetByUsername(username string) (*User, error)
 	GetByGithubId(githubId int64) (*User, error)
 
-	FilterByTime(time time.Time) Users
 	FilterById(id *int64) Users
 	SearchBy(search string) Users
 
 	Page(pageParams pgdb.OffsetPageParams) Users
-
-	ResetFilters() Users
 }
 
 type User struct {

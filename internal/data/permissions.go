@@ -7,26 +7,22 @@ type Permissions interface {
 
 	Create(user Permission) error
 	Upsert(permission Permission) error
-	Update(user Permission) error
+	UpdateUsernameAccessLevel(user Permission) error
 	UpdateUserId(permission Permission) error
 	UpdateHasParent(permission Permission) error
 	UpdateHasChild(permission Permission) error
 	UpdateParentLink(permission Permission) error
 	Delete(githubId int64, typeTo, link string) error
 
-	JoinsModule() Permissions
 	Select() ([]Permission, error)
 	Get() (*Permission, error)
 
-	FilterByUserIds(ids ...int64) Permissions
 	FilterByGithubIds(githubIds ...int64) Permissions
 	FilterByUsernames(usernames ...string) Permissions
 	FilterByLinks(links ...string) Permissions
 	FilterByTime(time time.Time) Permissions
 	FilterByParentLinks(parentLinks ...string) Permissions
 	FilterByHasParent(hasParent bool) Permissions
-
-	ResetFilters() Permissions
 }
 
 type Permission struct {

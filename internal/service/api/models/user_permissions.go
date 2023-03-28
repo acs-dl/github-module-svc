@@ -1,10 +1,11 @@
 package models
 
 import (
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/resources"
 	"strconv"
 	"time"
+
+	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/resources"
 )
 
 func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPermission {

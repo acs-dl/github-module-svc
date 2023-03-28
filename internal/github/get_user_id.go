@@ -3,9 +3,10 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
 
 func (g *github) GetUserIdFromApi(username string) (*data.User, *int64, error) {
@@ -27,14 +28,14 @@ func (g *github) GetUserIdFromApi(username string) (*data.User, *int64, error) {
 		return nil, nil, errors.New(fmt.Sprintf("error in response from API, status %s", res.Status))
 	}
 
-	var returned data.Permission
-	if err := json.NewDecoder(res.Body).Decode(&returned); err != nil {
+	var response data.Permission
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 		return nil, nil, errors.Wrap(err, " failed to unmarshal body")
 	}
 
 	return &data.User{
-		Username:  returned.Username,
-		GithubId:  returned.GithubId,
-		AvatarUrl: returned.AvatarUrl,
-	}, &returned.GithubId, nil
+		Username:  response.Username,
+		GithubId:  response.GithubId,
+		AvatarUrl: response.AvatarUrl,
+	}, &response.GithubId, nil
 }

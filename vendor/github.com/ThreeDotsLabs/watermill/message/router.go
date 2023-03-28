@@ -46,15 +46,16 @@ var PassthroughHandler HandlerFunc = func(msg *Message) ([]*Message, error) {
 // It can be attached to the router by using `AddMiddleware` method.
 //
 // Example:
-//		func ExampleMiddleware(h message.HandlerFunc) message.HandlerFunc {
-//			return func(message *message.Message) ([]*message.Message, error) {
-//				fmt.Println("executed before handler")
-//				producedMessages, err := h(message)
-//				fmt.Println("executed after handler")
 //
-//				return producedMessages, err
-//			}
+//	func ExampleMiddleware(h message.HandlerFunc) message.HandlerFunc {
+//		return func(message *message.Message) ([]*message.Message, error) {
+//			fmt.Println("executed before handler")
+//			producedMessages, err := h(message)
+//			fmt.Println("executed after handler")
+//
+//			return producedMessages, err
 //		}
+//	}
 type HandlerMiddleware func(h HandlerFunc) HandlerFunc
 
 // RouterPlugin is function which is executed on Router start.
@@ -389,10 +390,11 @@ func (r *Router) closeWhenAllHandlersStopped() {
 
 // Running is closed when router is running.
 // In other words: you can wait till router is running using
-//		fmt.Println("Starting router")
-//		go r.Run(ctx)
-//		<- r.Running()
-//		fmt.Println("Router is running")
+//
+//	fmt.Println("Starting router")
+//	go r.Run(ctx)
+//	<- r.Running()
+//	fmt.Println("Router is running")
 func (r *Router) Running() chan struct{} {
 	return r.running
 }

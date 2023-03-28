@@ -3,10 +3,11 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
 	"strconv"
+
+	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (g *github) GetUsersFromApi(link, typeTo string) ([]data.Permission, error) {

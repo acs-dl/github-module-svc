@@ -1,10 +1,11 @@
 package processor
 
 import (
+	"time"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"time"
 )
 
 func (p *processor) validateGetUsers(msg data.ModulePayload) error {
@@ -70,7 +71,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				return errors.Wrap(err, "failed to create user in user db")
 			}
 
-			p.usersQ.ResetFilters()
+			p.resetFilters()
 
 			usrDb, err := p.usersQ.GetByUsername(user.Username)
 			if err != nil {

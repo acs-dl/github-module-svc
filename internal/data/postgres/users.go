@@ -3,11 +3,11 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+
 	"github.com/fatih/structs"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"strings"
-	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"gitlab.com/distributed_lab/kit/pgdb"
@@ -89,17 +89,20 @@ func (q *UsersQ) GetByGithubId(githubId int64) (*data.User, error) {
 }
 
 func (q *UsersQ) Delete(githubId int64) error {
-	query := sq.Delete(usersTableName).Where(
-		sq.Eq{"github_id": githubId})
+	var deleted []data.User
 
-	result, err := q.db.ExecWithResult(query)
+	query := sq.Delete(subsTableName).
+		Where(sq.Eq{
+			"github_id": githubId,
+		}).
+		Suffix("RETURNING *")
+
+	err := q.db.Select(&deleted, query)
 	if err != nil {
 		return err
 	}
-
-	affectedRows, _ := result.RowsAffected()
-	if affectedRows == 0 {
-		return errors.Errorf("no users with id `%d`", githubId)
+	if len(deleted) == 0 {
+		return errors.Errorf("no rows with `%d` github id", githubId)
 	}
 
 	return nil
@@ -109,12 +112,6 @@ func (q *UsersQ) FilterById(id *int64) data.Users {
 	stmt := sq.Eq{usersTableName + ".id": id}
 
 	q.sql = q.sql.Where(stmt)
-
-	return q
-}
-
-func (q *UsersQ) FilterByTime(time time.Time) data.Users {
-	q.sql = q.sql.Where(sq.Gt{usersTableName + ".created_at": time})
 
 	return q
 }
@@ -163,10 +160,4 @@ func (q *UsersQ) GetTotalCount() (int64, error) {
 	err := q.db.Get(&count, q.sql)
 
 	return count, err
-}
-
-func (q *UsersQ) ResetFilters() data.Users {
-	q.sql = selectedUsersTable
-
-	return q
 }

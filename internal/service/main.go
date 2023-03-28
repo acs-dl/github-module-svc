@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
+	"sync"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/receiver"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/registrator"
 	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
-	"sync"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api"

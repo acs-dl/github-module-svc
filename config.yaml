@@ -5,10 +5,6 @@ log:
 db:
   url: "postgres://github:github@localhost:5447/github?sslmode=disable"
 
-cache:
-  default_expiration: 35m #time for default duration of each cache item (f.e. 10m5s)
-  cleanup_interval: 5m #interval with which garbage collector will work (f.e. 10m5s)
-
 amqp:
   topic: "github"
   publisher: "amqp://guest:guest@localhost:5672/" #github_publisher

@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
-	"net/http"
 )
 
 func GetUserById(w http.ResponseWriter, r *http.Request) {

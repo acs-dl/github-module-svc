@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
@@ -11,7 +13,6 @@ import (
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"gitlab.com/distributed_lab/running"
-	"time"
 )
 
 const serviceName = data.ModuleName + "-worker"
@@ -122,7 +123,6 @@ func (w *worker) createSubs(link data.Link) error {
 		Link:     sub.Link,
 		Type:     typeTo,
 		ParentId: nil,
-		Lpath:    fmt.Sprintf("%d", sub.Id),
 	})
 	if err != nil {
 		w.logger.Infof("failed to upsert sub for link `%s`", link.Link)
@@ -139,7 +139,7 @@ func (w *worker) createSubs(link data.Link) error {
 		return nil
 	}
 
-	err = w.processNested(link.Link, sub.Id, fmt.Sprintf("%d", sub.Id))
+	err = w.processNested(link.Link, sub.Id)
 	if err != nil {
 		w.logger.Infof("failed to index subs for link `%s`", link.Link)
 		return errors.Wrap(err, "failed to index subs")
@@ -149,7 +149,7 @@ func (w *worker) createSubs(link data.Link) error {
 	return nil
 }
 
-func (w *worker) processNested(link string, parentId int64, parentLpath string) error {
+func (w *worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
 
 	projects, err := w.githubClient.GetProjectsFromApi(link)
@@ -165,7 +165,6 @@ func (w *worker) processNested(link string, parentId int64, parentLpath string) 
 			Link:     link + "/" + project.Path,
 			Type:     data.Repository,
 			ParentId: &parentId,
-			Lpath:    fmt.Sprintf("%s.%d", parentLpath, project.Id),
 		})
 		if err != nil {
 			w.logger.Infof("failed to upsert sub with link `%s`", link+"/"+project.Path)

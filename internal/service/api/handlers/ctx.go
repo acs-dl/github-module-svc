@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"context"
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"net/http"
+
+	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3"

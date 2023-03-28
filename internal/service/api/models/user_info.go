@@ -1,9 +1,10 @@
 package models
 
 import (
+	"strconv"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/resources"
-	"strconv"
 )
 
 func NewUserInfoModel(user data.User, id int) resources.UserInfo {
