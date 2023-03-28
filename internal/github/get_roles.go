@@ -2,8 +2,9 @@ package github
 
 import (
 	"fmt"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
+
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 // GetRolesFromApi it doesn't implemented yet, cause custom roles are for premium users

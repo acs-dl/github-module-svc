@@ -1,100 +1,94 @@
 -- +migrate Up
 
-CREATE TABLE IF NOT EXISTS responses (
-    id UUID PRIMARY KEY,
-    status TEXT NOT NULL,
-    error TEXT
---     payload JSONB,
---     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+create table if not exists responses (
+    id uuid primary key,
+    status text not null,
+    error text,
+    payload jsonb,
+    created_at timestamp without time zone not null default current_timestamp
 );
 
-CREATE TABLE IF NOT EXISTS users (
-    github_id BIGINT PRIMARY KEY,
-    id BIGINT UNIQUE,
-    username TEXT NOT NULL UNIQUE,
-    avatar_url TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+create table if not exists users (
+    github_id bigint primary key,
+    id bigint unique,
+    username text not null unique,
+    avatar_url text not null,
+    created_at timestamp with time zone default current_timestamp
 );
 
-CREATE INDEX IF NOT EXISTS users_id_idx ON users(id);
-CREATE INDEX IF NOT EXISTS users_username_idx ON users(username);
-CREATE INDEX IF NOT EXISTS users_githubId_idx ON users(github_id);
+create index if not exists users_id_idx on users(id);
+create index if not exists users_username_idx on users(username);
+create index if not exists users_githubid_idx on users(github_id);
 
-CREATE TABLE IF NOT EXISTS links (
-    id SERIAL PRIMARY KEY,
-    link TEXT NOT NULL,
-    UNIQUE(link)
+create table if not exists links (
+    id serial primary key,
+    link text not null,
+    unique(link)
 );
-INSERT INTO links (link) VALUES ('mhrynenko/TESTAPI');
-INSERT INTO links (link) VALUES ('acstestapi');
+insert into links (link) values ('mhrynenko/testapi');
+insert into links (link) values ('acstestapi');
 
-CREATE INDEX IF NOT EXISTS links_link_idx ON links(link);
+create index if not exists links_link_idx on links(link);
 
-CREATE EXTENSION IF NOT EXISTS ltree;
+create table if not exists subs (
+    id bigint primary key,
+    link text unique not null,
+    path text not null,
+    type text not null,
+    parent_id bigint,
 
-CREATE TABLE IF NOT EXISTS subs (
-    id BIGINT PRIMARY KEY,
-    link TEXT UNIQUE NOT NULL,
-    path TEXT NOT NULL,
-    type TEXT NOT NULL,
-    parent_id BIGINT,
-    lpath ltree,
-
-    UNIQUE (id, parent_id)
+    unique (id, parent_id)
 );
 
-CREATE INDEX IF NOT EXISTS lpath_gist_idx ON subs USING GIST (lpath);
-CREATE INDEX IF NOT EXISTS lpath_btree_idx ON subs USING BTREE (lpath);
-CREATE INDEX IF NOT EXISTS subs_id_idx ON subs(id);
-CREATE INDEX IF NOT EXISTS subs_link_idx ON subs(link);
-CREATE INDEX IF NOT EXISTS subs_parentId_idx ON subs(parent_id);
+create index if not exists subs_id_idx on subs(id);
+create index if not exists subs_link_idx on subs(link);
+create index if not exists subs_parentid_idx on subs(parent_id);
 
-CREATE TABLE IF NOT EXISTS permissions (
-    request_id TEXT NOT NULL,
-    user_id BIGINT,
-    username TEXT NOT NULL,
-    github_id INT NOT NULL,
-    link TEXT NOT NULL,
-    access_level TEXT NOT NULL,
-    type TEXT NOT NULL,
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-    expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    has_parent BOOLEAN NOT NULL DEFAULT TRUE,
-    has_child BOOLEAN NOT NULL DEFAULT FALSE,
+create table if not exists permissions (
+    request_id text not null,
+    user_id bigint,
+    username text not null,
+    github_id int not null,
+    link text not null,
+    access_level text not null,
+    type text not null,
+    created_at timestamp without time zone not null,
+    expires_at timestamp without time zone not null,
+    updated_at timestamp without time zone not null default current_timestamp,
+    has_parent boolean not null default true,
+    has_child boolean not null default false,
+    parent_link text,
 
-    UNIQUE (github_id, link),
-    FOREIGN KEY(github_id) REFERENCES users(github_id) ON DELETE CASCADE ON UPDATE CASCADE,
-    FOREIGN KEY(link) REFERENCES subs(link) ON DELETE CASCADE ON UPDATE CASCADE
+    unique (github_id, link),
+    foreign key(github_id) references users(github_id) on delete cascade on update cascade,
+    foreign key(link) references subs(link) on delete cascade on update cascade
 );
 
-CREATE INDEX IF NOT EXISTS permissions_userId_idx ON permissions(user_id);
-CREATE INDEX IF NOT EXISTS permissions_githubId_idx ON permissions(github_id);
-CREATE INDEX IF NOT EXISTS permissions_link_idx ON permissions(link);
+create index if not exists permissions_userid_idx on permissions(user_id);
+create index if not exists permissions_githubid_idx on permissions(github_id);
+create index if not exists permissions_link_idx on permissions(link);
 
 -- +migrate Down
 
-DROP TABLE IF EXISTS permissions;
-DROP TABLE IF EXISTS responses;
-DROP TABLE IF EXISTS links;
-DROP TABLE IF EXISTS subs;
-DROP TABLE IF EXISTS users;
+drop index if exists permissions_userid_idx;
+drop index if exists permissions_githubid_idx;
+drop index if exists permissions_link_idx;
 
-DROP INDEX IF EXISTS users_id_idx;
-DROP INDEX IF EXISTS users_username_idx;
-DROP INDEX IF EXISTS users_gitlabId_idx;
+drop table if exists permissions;
 
-DROP INDEX IF EXISTS links_link_idx;
+drop index if exists subs_id_idx;
+drop index if exists subs_link_idx;
+drop index if exists subs_parentid_idx;
 
-DROP INDEX IF EXISTS subs_id_idx;
-DROP INDEX IF EXISTS subs_link_idx;
-DROP INDEX IF EXISTS subs_parentId_idx;
+drop table if exists subs;
 
-DROP INDEX IF EXISTS permissions_userId_idx;
-DROP INDEX IF EXISTS permissions_gitlabId_idx;
-DROP INDEX IF EXISTS permissions_link_idx;
+drop index if exists links_link_idx;
 
-DROP INDEX IF EXISTS lpath_gist_idx;
-DROP INDEX IF EXISTS lpath_btree_idx;
+drop table if exists links;
 
-DROP EXTENSION IF EXISTS ltree;
+drop index if exists users_id_idx;
+drop index if exists users_username_idx;
+drop index if exists users_githubid_idx;
+
+drop table if exists users;
+drop table if exists responses;

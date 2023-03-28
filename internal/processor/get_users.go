@@ -1,10 +1,11 @@
 package processor
 
 import (
+	"time"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"time"
 )
 
 func (p *processor) validateGetUsers(msg data.ModulePayload) error {
@@ -39,7 +40,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "some error while getting users from api")
 	}
 
-	borderTime := time.Now()
+	usersToUnverified := make([]data.User, 0)
 
 	for _, user := range users {
 		//api doesn't return role for organization members
@@ -55,18 +56,22 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 			}
 			user.AccessLevel = permission.AccessLevel
 		}
+
+		dbUser := data.User{
+			Username:  user.Username,
+			GithubId:  user.GithubId,
+			CreatedAt: time.Now(),
+			AvatarUrl: user.AvatarUrl,
+		}
+		usersToUnverified = append(usersToUnverified, dbUser)
+
 		err = p.managerQ.Transaction(func() error {
-			if err = p.usersQ.Upsert(data.User{
-				Username:  user.Username,
-				GithubId:  user.GithubId,
-				CreatedAt: time.Now(),
-				AvatarUrl: user.AvatarUrl,
-			}); err != nil {
+			if err = p.usersQ.Upsert(dbUser); err != nil {
 				p.log.WithError(err).Errorf("failed to create user in user db for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to create user in user db")
 			}
 
-			p.usersQ.ResetFilters()
+			p.resetFilters()
 
 			usrDb, err := p.usersQ.GetByUsername(user.Username)
 			if err != nil {
@@ -89,6 +94,22 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				return errors.Wrap(err, "failed to upsert permission in permission db")
 			}
 
+			subPermission, err := p.subsQ.WithPermissions().FilterByGithubIds(user.GithubId).FilterByLinks(user.Link).OrderBy("subs_link").Get()
+			if err != nil {
+				p.log.WithError(err).Errorf("failed to get permission for message action with id `%s`", msg.RequestId)
+				return errors.Wrap(err, "failed to get permission in permission db")
+			}
+			if subPermission == nil {
+				p.log.WithError(err).Errorf("got empty permission for message action with id `%s`", msg.RequestId)
+				return errors.Wrap(err, "got empty permission in permission db")
+			}
+
+			err = p.checkHasParent(*subPermission)
+			if err != nil {
+				p.log.WithError(err).Errorf("failed to check parent level for message action with id `%s`", msg.RequestId)
+				return errors.Wrap(err, "failed to check parent level")
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -97,7 +118,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		}
 	}
 
-	err = p.sendUsers(msg.RequestId, borderTime)
+	err = p.sendUsers(msg.RequestId, usersToUnverified)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to publish users for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to publish users")
@@ -105,5 +126,78 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 
 	p.resetFilters()
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
+	return nil
+}
+
+func (p *processor) checkHasParent(permission data.Sub) error {
+	if permission.ParentId == nil {
+		err := p.permissionsQ.UpdateHasParent(data.Permission{
+			HasParent: false,
+			GithubId:  permission.GithubId,
+			Link:      permission.Link,
+		})
+		if err != nil {
+			p.log.Errorf("failed to update parent level")
+			return errors.Wrap(err, "failed to update parent level")
+		}
+
+		return nil
+	}
+
+	parentPermission, err := p.subsQ.WithPermissions().FilterByGithubIds(permission.GithubId).FilterByIds(*permission.ParentId).OrderBy("subs_link").Get()
+	if err != nil {
+		p.log.Errorf("failed to get parent permission")
+		return errors.Wrap(err, "failed to get parent permission")
+	}
+
+	if parentPermission == nil {
+		//suppose that it means: that user is not in parent repo only in lower level
+		err = p.permissionsQ.UpdateHasParent(data.Permission{
+			HasParent: false,
+			GithubId:  permission.GithubId,
+			Link:      permission.Link,
+		})
+		if err != nil {
+			p.log.Errorf("failed to update parent level")
+			return errors.Wrap(err, "failed to update parent level")
+		}
+
+		return nil
+	}
+
+	err = p.permissionsQ.UpdateParentLink(data.Permission{
+		GithubId:   permission.GithubId,
+		Link:       permission.Link,
+		ParentLink: &parentPermission.Link,
+	})
+	if err != nil {
+		p.log.Errorf("failed to update parent link")
+		return errors.Wrap(err, "failed to update parent link")
+	}
+
+	if permission.AccessLevel == parentPermission.AccessLevel {
+		return nil
+	}
+
+	err = p.permissionsQ.UpdateHasParent(data.Permission{
+		HasParent: false,
+		GithubId:  permission.GithubId,
+		Link:      permission.Link,
+	})
+	if err != nil {
+		p.log.Errorf("failed to update parent level")
+		return errors.Wrap(err, "failed to update parent level")
+	}
+
+	err = p.permissionsQ.UpdateHasChild(data.Permission{
+		HasChild: true,
+		GithubId: parentPermission.GithubId,
+		Link:     parentPermission.Link,
+	})
+	if err != nil {
+		p.log.Errorf("failed to update parent level")
+		return errors.Wrap(err, "failed to update parent level")
+	}
+
 	return nil
 }

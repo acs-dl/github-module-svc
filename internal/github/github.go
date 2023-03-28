@@ -20,7 +20,6 @@ type GithubClient interface {
 	CheckRepoCollaborator(link, username string) (bool, *data.Permission, error)
 	CheckOrgCollaborator(link, username string) (bool, *data.Permission, error)
 
-	//GetRolesFromApi(link string) (bool, error)
 	FindType(link string) (string, *data.Sub, error)
 	FindRepoOwner(link string) (string, error)
 

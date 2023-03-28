@@ -3,9 +3,10 @@ package github
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
 
 func (g *github) SearchByFromApi(username string) ([]data.User, error) {

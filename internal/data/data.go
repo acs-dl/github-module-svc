@@ -9,7 +9,6 @@ const (
 	UserOwned         = "User"
 	OrganizationOwned = "Organization"
 	Push              = "push"
-	Project           = "project"
 	Group             = "group"
 )
 

@@ -55,28 +55,21 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 	}
 
 	var dbUser *data.User
-	err = p.managerQ.Transaction(func() error {
-		dbUser, err = p.usersQ.GetByGithubId(*githubId)
-		if err != nil {
-			p.log.WithError(err).Errorf("failed to get user by github id `%d` for message action with id `%s`", *githubId, msg.RequestId)
-			return errors.Wrap(err, "failed to get user")
-		}
-
-		if dbUser == nil {
-			p.log.WithError(err).Errorf("something wrong with db user for message action with id `%s`", *githubId, msg.RequestId)
-			return errors.Wrap(err, "something wrong with db user")
-		}
-
-		err = p.usersQ.Delete(*githubId)
-		if err != nil {
-			p.log.WithError(err).Errorf("failed to delete user by github id `%d` for message action with id `%s`", *githubId, msg.RequestId)
-			return errors.Wrap(err, "failed to delete user")
-		}
-		return nil
-	})
+	dbUser, err = p.usersQ.GetByGithubId(*githubId)
 	if err != nil {
-		p.log.WithError(err).Errorf("failed to make delete users transaction for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "failed to make delete users transaction")
+		p.log.WithError(err).Errorf("failed to get user by github id `%d` for message action with id `%s`", *githubId, msg.RequestId)
+		return errors.Wrap(err, "failed to get user")
+	}
+
+	if dbUser == nil {
+		p.log.WithError(err).Errorf("something wrong with db user for message action with id `%s`", *githubId, msg.RequestId)
+		return errors.Wrap(err, "something wrong with db user")
+	}
+
+	err = p.usersQ.Delete(*githubId)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to delete user by github id `%d` for message action with id `%s`", *githubId, msg.RequestId)
+		return errors.Wrap(err, "failed to delete user")
 	}
 
 	if dbUser.Id == nil {

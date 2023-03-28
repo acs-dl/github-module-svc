@@ -1,12 +1,13 @@
 package handlers
 
 import (
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
-	"net/http"
 )
 
 func GetPermissions(w http.ResponseWriter, r *http.Request) {
@@ -22,45 +23,22 @@ func GetPermissions(w http.ResponseWriter, r *http.Request) {
 		userIds = append(userIds, *request.UserId)
 	}
 
-	var parentIds []int64
-
-	statement := SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
-		FilterByHasParent(false).FilterByParentIds(parentIds...)
-
-	totalCount := SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
-		FilterByHasParent(false).FilterByParentIds(parentIds...)
-
+	var parentLinks []string
 	if request.ParentLink != nil {
-		permission, err := SubsQ(r).FilterByLinks(*request.ParentLink).Get()
-		if err != nil {
-			Log(r).WithError(err).Error("failed to get permission")
-			ape.RenderErr(w, problems.InternalError())
-			return
-		}
-		if permission == nil {
-			ape.Render(w, models.NewUserPermissionListResponse([]data.Sub{}))
-			return
-		}
-
-		SubsQ(r).ResetFilters()
-
-		parentIds = append(parentIds, permission.Id)
-
-		statement = SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
-			FilterByHasParent(false).FilterByParentIds(parentIds...)
-		totalCount = SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
-			FilterByHasParent(false).FilterByParentIds(parentIds...)
+		parentLinks = append(parentLinks, *request.ParentLink)
 	}
 
-	var link = ""
-	if request.Link != nil {
-		link = *request.Link
-		parentIds = nil
+	statement := SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
+		FilterByHasParent(false).FilterByParentLinks(parentLinks...)
 
+	totalCount := SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
+		FilterByHasParent(false).FilterByParentLinks(parentLinks...)
+
+	if request.Link != nil {
 		statement = SubsQ(r).WithPermissions().FilterByUserIds(userIds...).
-			SearchBy(link)
+			SearchBy(*request.Link)
 		totalCount = SubsQ(r).CountWithPermissions().FilterByUserIds(userIds...).
-			SearchBy(link)
+			SearchBy(*request.Link)
 	}
 
 	permissions, err := statement.Page(request.OffsetPageParams).Select()

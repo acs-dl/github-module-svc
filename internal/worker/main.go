@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
@@ -11,7 +13,6 @@ import (
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"gitlab.com/distributed_lab/running"
-	"time"
 )
 
 const serviceName = data.ModuleName + "-worker"
@@ -25,8 +26,8 @@ type worker struct {
 	processor    processor.Processor
 	githubClient github.GithubClient
 	linksQ       data.Links
-	subsQ        data.Subs
 	usersQ       data.Users
+	subsQ        data.Subs
 	permissionsQ data.Permissions
 }
 
@@ -83,52 +84,22 @@ func (w *worker) processPermissions(_ context.Context) error {
 
 	}
 
-	err = w.createPermissions()
-	if err != nil {
-		w.logger.Infof("failed to create permissions for subs")
-		return errors.Wrap(err, "failed to create permissions for subs")
-	}
-
-	err = w.checkHasParent()
-	if err != nil {
-		w.logger.Infof("failed to check parent levels for subs")
-		return errors.Wrap(err, "failed to check parent levels for for subs")
-	}
-
 	return nil
 }
 
-func (w *worker) createPermissions() error {
-	w.logger.Info("fetching subs")
+func (w *worker) createPermission(link string) error {
+	w.logger.Infof("processing sub `%s`", link)
 
-	subs, err := w.subsQ.Select()
-	if err != nil {
-		w.logger.Infof("failed to get subs")
-		return errors.Wrap(err, "failed to get subs")
+	if err := w.processor.HandleNewMessage(data.ModulePayload{
+		RequestId: "from-worker",
+		Action:    processor.GetUsersAction,
+		Link:      link,
+	}); err != nil {
+		w.logger.Infof("failed to get users sub `%s`", link)
+		return errors.Wrap(err, "failed to get users")
 	}
 
-	reqAmount := len(subs)
-	if reqAmount == 0 {
-		w.logger.Info("no subs were found")
-		return nil
-	}
-
-	w.logger.Infof("found %v subs", reqAmount)
-
-	for _, sub := range subs {
-		w.logger.Infof("processing sub `%s`", sub.Link)
-
-		if err = w.processor.HandleNewMessage(data.ModulePayload{
-			RequestId: "from-worker",
-			Action:    processor.GetUsersAction,
-			Link:      sub.Link,
-		}); err != nil {
-			w.logger.Infof("failed to get users sub `%s`", sub.Link)
-			return errors.Wrap(err, "failed to get users")
-		}
-
-		w.logger.Infof("successfully processed sub `%s", sub.Link)
-	}
+	w.logger.Infof("successfully processed sub `%s", link)
 
 	return nil
 }
@@ -152,18 +123,23 @@ func (w *worker) createSubs(link data.Link) error {
 		Link:     sub.Link,
 		Type:     typeTo,
 		ParentId: nil,
-		Lpath:    fmt.Sprintf("%d", sub.Id),
 	})
 	if err != nil {
 		w.logger.Infof("failed to upsert sub for link `%s`", link.Link)
 		return errors.Wrap(err, "failed to upsert sub")
 	}
 
+	err = w.createPermission(sub.Link)
+	if err != nil {
+		w.logger.Infof("failed to create permissions for sub with link `%s`", link.Link)
+		return errors.Wrap(err, "failed to create permissions for sub")
+	}
+
 	if typeTo == data.Repository {
 		return nil
 	}
 
-	err = w.processNested(link.Link, sub.Id, fmt.Sprintf("%d", sub.Id))
+	err = w.processNested(link.Link, sub.Id)
 	if err != nil {
 		w.logger.Infof("failed to index subs for link `%s`", link.Link)
 		return errors.Wrap(err, "failed to index subs")
@@ -173,7 +149,7 @@ func (w *worker) createSubs(link data.Link) error {
 	return nil
 }
 
-func (w *worker) processNested(link string, parentId int64, parentLpath string) error {
+func (w *worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
 
 	projects, err := w.githubClient.GetProjectsFromApi(link)
@@ -189,102 +165,18 @@ func (w *worker) processNested(link string, parentId int64, parentLpath string) 
 			Link:     link + "/" + project.Path,
 			Type:     data.Repository,
 			ParentId: &parentId,
-			Lpath:    fmt.Sprintf("%s.%d", parentLpath, project.Id),
 		})
 		if err != nil {
 			w.logger.Infof("failed to upsert sub with link `%s`", link+"/"+project.Path)
 			return errors.Wrap(err, fmt.Sprintf("failed to get upsert sub with link `%s`", link+"/"+project.Path))
 		}
-	}
 
-	return nil
-}
-
-func (w *worker) checkHasParent() error {
-	w.logger.Infof("started checking parent levels for subs")
-
-	users, err := w.usersQ.Select()
-	if err != nil {
-		w.logger.Errorf("failed to select users")
-		return errors.Wrap(err, "failed to select users")
-	}
-	if len(users) == 0 {
-		w.logger.Infof("no user was found")
-		return nil
-	}
-
-	w.logger.Infof("found `%v` users to check levels", len(users))
-	for _, user := range users {
-		permissions, err := w.subsQ.WithPermissions().FilterByGithubIds(user.GithubId).OrderBy("subs_link").Select()
+		err = w.createPermission(link + "/" + project.Path)
 		if err != nil {
-			w.logger.Errorf("failed to select permissions")
-			return errors.Wrap(err, "failed to select permissions")
+			w.logger.Infof("failed to create permissions for sub with link `%s`", link+"/"+project.Path)
+			return errors.Wrap(err, "failed to create permissions for sub")
 		}
-		if len(permissions) == 0 {
-			w.logger.Infof("no permission for user `%s` was found", user.Username)
-			continue
-		}
-
-		w.logger.Infof("found `%v` permissions for user `%s`", len(permissions), user.Username)
-		for _, permission := range permissions {
-			if permission.ParentId == nil {
-				err = w.permissionsQ.UpdateHasParent(data.Permission{
-					HasParent: false,
-					GithubId:  permission.GithubId,
-					Link:      permission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-				continue
-			}
-
-			parentPermission, err := w.subsQ.WithPermissions().FilterByGithubIds(user.GithubId).FilterByIds(*permission.ParentId).OrderBy("subs_link").Get()
-			if err != nil {
-				w.logger.Errorf("failed to get parent permission")
-				return errors.Wrap(err, "failed to get parent permission")
-			}
-
-			if parentPermission == nil {
-				//suppose that it means: that user is not in parent repo only in lower level
-				err = w.permissionsQ.UpdateHasParent(data.Permission{
-					HasParent: false,
-					GithubId:  permission.GithubId,
-					Link:      permission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-				continue
-			}
-
-			if permission.AccessLevel != parentPermission.AccessLevel {
-				err = w.permissionsQ.UpdateHasParent(data.Permission{
-					HasParent: false,
-					GithubId:  permission.GithubId,
-					Link:      permission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-
-				err = w.permissionsQ.UpdateHasChild(data.Permission{
-					HasChild: true,
-					GithubId: parentPermission.GithubId,
-					Link:     parentPermission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-			}
-		}
-		w.logger.Infof("finished checking levels for user `%s`", user.Username)
 	}
 
-	w.logger.Infof("finished checking parent levels for subs")
 	return nil
 }
