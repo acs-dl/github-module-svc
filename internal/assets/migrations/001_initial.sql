@@ -13,6 +13,7 @@ create table if not exists users (
     id bigint unique,
     username text not null unique,
     avatar_url text not null,
+    updated_at timestamp with time zone not null default current_timestamp,
     created_at timestamp with time zone default current_timestamp
 );
 

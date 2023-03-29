@@ -1,6 +1,9 @@
 package github
 
-import "gitlab.com/distributed_lab/acs/github-module/internal/data"
+import (
+	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/logan/v3"
+)
 
 type GithubClient interface {
 	AddUserFromApi(link, username, permission string) (*data.Permission, error)
@@ -29,10 +32,12 @@ type GithubClient interface {
 
 type github struct {
 	token string
+	log   *logan.Entry
 }
 
-func NewGithub(token string) GithubClient {
+func NewGithub(token string, log *logan.Entry) GithubClient {
 	return &github{
 		token: token,
+		log:   log,
 	}
 }

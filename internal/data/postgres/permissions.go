@@ -193,8 +193,14 @@ func (q *PermissionsQ) FilterByHasParent(hasParent bool) data.Permissions {
 	return q
 }
 
-func (q *PermissionsQ) FilterByTime(time time.Time) data.Permissions {
+func (q *PermissionsQ) FilterByGreaterTime(time time.Time) data.Permissions {
 	q.sql = q.sql.Where(sq.Gt{permissionsTableName + ".updated_at": time})
+
+	return q
+}
+
+func (q *PermissionsQ) FilterByLowerTime(time time.Time) data.Permissions {
+	q.sql = q.sql.Where(sq.Lt{permissionsTableName + ".updated_at": time})
 
 	return q
 }

@@ -35,7 +35,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err = github.NewGithub(Params(r).Token).SearchByFromApi(username)
+	users, err = github.NewGithub(Params(r).Token, Log(r)).SearchByFromApi(username)
 	if err != nil {
 		Log(r).WithError(err).Infof("failed to get users from api by `%s`", username)
 		ape.RenderErr(w, problems.InternalError())

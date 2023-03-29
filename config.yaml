@@ -22,6 +22,7 @@ registrator:
   topic: "github" #MODULE topic
   title: "Github" #MODULE title
   prefix: "https://github.com"
+  is_module: true
 
 jwt:
   secret: SuPeR SeCrEt PhRaSe

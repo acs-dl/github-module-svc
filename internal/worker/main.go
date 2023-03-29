@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
@@ -35,7 +36,7 @@ func NewWorker(cfg config.Config) Worker {
 	return &worker{
 		logger:       cfg.Log().WithField("runner", serviceName),
 		processor:    processor.NewProcessor(cfg),
-		githubClient: github.NewGithub(cfg.Github().Token),
+		githubClient: github.NewGithub(cfg.Github().Token, cfg.Log().WithField("runner", serviceName)),
 		linksQ:       postgres.NewLinksQ(cfg.DB()),
 		subsQ:        postgres.NewSubsQ(cfg.DB()),
 		usersQ:       postgres.NewUsersQ(cfg.DB()),
@@ -57,6 +58,8 @@ func (w *worker) Run(ctx context.Context) {
 
 func (w *worker) processPermissions(_ context.Context) error {
 	w.logger.Info("fetching links")
+
+	startTime := time.Now()
 
 	links, err := w.linksQ.Select()
 	if err != nil {
@@ -84,6 +87,72 @@ func (w *worker) processPermissions(_ context.Context) error {
 
 	}
 
+	err = w.removeOldUsers(startTime)
+	if err != nil {
+		w.logger.WithError(err).Errorf("failed to remove old users")
+		return errors.Wrap(err, "failed to remove old users")
+	}
+
+	err = w.removeOldPermissions(startTime)
+	if err != nil {
+		w.logger.WithError(err).Errorf("failed to remove old permissions")
+		return errors.Wrap(err, "failed to remove old permissions")
+	}
+
+	return nil
+}
+
+func (w *worker) removeOldUsers(borderTime time.Time) error {
+	w.logger.Infof("started removing old users")
+
+	users, err := w.usersQ.FilterByLowerTime(borderTime).Select()
+	if err != nil {
+		w.logger.Infof("failed to select users")
+		return errors.Wrap(err, " failed to select users")
+	}
+
+	w.logger.Infof("found `%d` users to delete", len(users))
+
+	for _, user := range users {
+		if user.Id == nil { //if unverified user we need to remove them from `unverified-svc`
+			err = w.processor.SendDeleteUser(uuid.New().String(), user)
+			if err != nil {
+				w.logger.WithError(err).Errorf("failed to publish delete user")
+				return errors.Wrap(err, " failed to publish delete user")
+			}
+		}
+
+		err = w.usersQ.Delete(user.GithubId)
+		if err != nil {
+			w.logger.Infof("failed to delete user with github id `%d`", user.GithubId)
+			return errors.Wrap(err, " failed to delete user")
+		}
+	}
+
+	w.logger.Infof("finished removing old users")
+	return nil
+}
+
+func (w *worker) removeOldPermissions(borderTime time.Time) error {
+	w.logger.Infof("started removing old permissions")
+
+	permissions, err := w.permissionsQ.FilterByLowerTime(borderTime).Select()
+	if err != nil {
+		w.logger.Infof("failed to select permissions")
+		return errors.Wrap(err, " failed to select permissions")
+	}
+
+	w.logger.Infof("found `%d` permissions to delete", len(permissions))
+
+	for _, permission := range permissions {
+		err = w.permissionsQ.Delete(permission.GithubId, permission.Type, permission.Link)
+		if err != nil {
+			w.logger.Infof("failed to delete permission")
+			return errors.Wrap(err, " failed to delete permission")
+		}
+	}
+
+	w.logger.Infof("finished removing old permissions")
 	return nil
 }
 

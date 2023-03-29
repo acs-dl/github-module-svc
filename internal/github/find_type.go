@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
@@ -44,6 +45,16 @@ func (g *github) GetRepoFromApi(link string) (*data.Sub, error) {
 		return nil, errors.Wrap(err, " error making http request")
 	}
 
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.GetRepoFromApi(link)
+	}
+
 	if res.StatusCode == http.StatusNotFound {
 		return nil, nil
 	}
@@ -74,6 +85,16 @@ func (g *github) GetOrgFromApi(link string) (*data.Sub, error) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, " error making http request")
+	}
+
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.GetOrgFromApi(link)
 	}
 
 	if res.StatusCode == http.StatusNotFound {

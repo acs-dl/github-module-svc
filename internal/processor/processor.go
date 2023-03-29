@@ -29,6 +29,7 @@ const (
 
 type Processor interface {
 	HandleNewMessage(msg data.ModulePayload) error
+	SendDeleteUser(uuid string, user data.User) error
 }
 
 type processor struct {
@@ -53,7 +54,7 @@ var handleActions = map[string]func(proc *processor, msg data.ModulePayload) err
 func NewProcessor(cfg config.Config) Processor {
 	return &processor{
 		log:          cfg.Log().WithField("service", serviceName),
-		githubClient: github.NewGithub(cfg.Github().Token),
+		githubClient: github.NewGithub(cfg.Github().Token, cfg.Log().WithField("service", serviceName)),
 		permissionsQ: postgres.NewPermissionsQ(cfg.DB()),
 		subsQ:        postgres.NewSubsQ(cfg.DB()),
 		usersQ:       postgres.NewUsersQ(cfg.DB()),

@@ -23,7 +23,7 @@ func (g *github) GetRolesFromApi(id string) (bool, error) {
 		return false, errors.Wrap(err, " error making http request")
 	}
 
-	if res.StatusCode == 200 {
+	if res.StatusCode == http.StatusOK {
 		return true, nil
 	}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
@@ -22,6 +23,16 @@ func (g *github) GetUserIdFromApi(username string) (*data.User, *int64, error) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, " error making http request")
+	}
+
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.GetUserIdFromApi(username)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

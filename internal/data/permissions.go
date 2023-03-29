@@ -20,7 +20,8 @@ type Permissions interface {
 	FilterByGithubIds(githubIds ...int64) Permissions
 	FilterByUsernames(usernames ...string) Permissions
 	FilterByLinks(links ...string) Permissions
-	FilterByTime(time time.Time) Permissions
+	FilterByGreaterTime(time time.Time) Permissions
+	FilterByLowerTime(time time.Time) Permissions
 	FilterByParentLinks(parentLinks ...string) Permissions
 	FilterByHasParent(hasParent bool) Permissions
 }

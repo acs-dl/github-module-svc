@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
@@ -35,11 +36,21 @@ func (g *github) CheckRepoCollaborator(link, username string) (bool, *data.Permi
 		return false, nil, errors.Wrap(err, " error making http request")
 	}
 
-	if res.StatusCode == 404 {
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return false, nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.CheckRepoCollaborator(link, username)
+	}
+
+	if res.StatusCode == http.StatusNotFound {
 		return false, nil, nil
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return false, nil, errors.Errorf("unexpected status %s", res.Status)
 	}
 
@@ -79,11 +90,21 @@ func (g *github) CheckOrgCollaborator(link, username string) (bool, *data.Permis
 		return false, nil, errors.Wrap(err, " error making http request")
 	}
 
-	if res.StatusCode == 404 {
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return false, nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.CheckOrgCollaborator(link, username)
+	}
+
+	if res.StatusCode == http.StatusNotFound {
 		return false, nil, nil
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return false, nil, errors.Errorf("unexpected status %s", res.Status)
 	}
 

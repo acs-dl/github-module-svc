@@ -325,8 +325,7 @@ func GenerateQueueNameConstant(queueName string) QueueNameGenerator {
 }
 
 // GenerateQueueNameTopicNameWithSuffix generates queue name equal to:
-//
-//	topic + "_" + suffix
+// 	topic + "_" + suffix
 func GenerateQueueNameTopicNameWithSuffix(suffix string) QueueNameGenerator {
 	return func(topic string) string {
 		return topic + "_" + suffix

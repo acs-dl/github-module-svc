@@ -63,7 +63,7 @@ func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to make add user transaction")
 	}
 
-	err = p.sendDeleteUser(msg.RequestId, user)
+	err = p.SendDeleteUser(msg.RequestId, user)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to publish delete user for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to publish delete user")

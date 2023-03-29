@@ -24,7 +24,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	githubClient := github.NewGithub(Params(r).Token)
+	githubClient := github.NewGithub(Params(r).Token, Log(r))
 
 	if request.Username != nil {
 		permission, err := PermissionsQ(r).FilterByUsernames(*request.Username).FilterByLinks(*request.Link).Get()
