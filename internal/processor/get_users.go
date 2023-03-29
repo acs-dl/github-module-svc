@@ -57,16 +57,13 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 			user.AccessLevel = permission.AccessLevel
 		}
 
-		dbUser := data.User{
-			Username:  user.Username,
-			GithubId:  user.GithubId,
-			CreatedAt: time.Now(),
-			AvatarUrl: user.AvatarUrl,
-		}
-		usersToUnverified = append(usersToUnverified, dbUser)
-
 		err = p.managerQ.Transaction(func() error {
-			if err = p.usersQ.Upsert(dbUser); err != nil {
+			if err = p.usersQ.Upsert(data.User{
+				Username:  user.Username,
+				GithubId:  user.GithubId,
+				CreatedAt: time.Now(),
+				AvatarUrl: user.AvatarUrl,
+			}); err != nil {
 				p.log.WithError(err).Errorf("failed to create user in user db for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to create user in user db")
 			}
@@ -82,6 +79,8 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				p.log.Errorf("no user with such username `%s` for message action with id `%s`", user.Username, msg.RequestId)
 				return errors.Wrap(err, "no user with such username")
 			}
+
+			usersToUnverified = append(usersToUnverified, *usrDb)
 
 			user.UserId = usrDb.Id
 			user.Link = msg.Link
