@@ -36,6 +36,7 @@ type User struct {
 	AvatarUrl string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
 	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"-"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at" structs:"-"`
+	Submodule *string   `json:"-" db:"-" structs:"-"`
 }
 
 type UnverifiedUser struct {
