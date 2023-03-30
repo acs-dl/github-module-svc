@@ -30,7 +30,7 @@ func GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	permission, err := PermissionsQ(r).FilterByGithubIds(user.GithubId).Get()
+	permission, err := PermissionsQ(r).FilterByHasParent(false).FilterByParentLinks([]string{}...).FilterByGithubIds(user.GithubId).Get()
 	if err != nil {
 		Log(r).Errorf("failed to get submodule for user with id `%d`", userId)
 		ape.RenderErr(w, problems.NotFound())
