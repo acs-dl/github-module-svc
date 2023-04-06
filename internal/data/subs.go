@@ -5,10 +5,8 @@ import "gitlab.com/distributed_lab/kit/pgdb"
 type Subs interface {
 	New() Subs
 
-	Insert(sub Sub) error
 	Upsert(sub Sub) error
-	Delete(subId int64, typeTo, link string) error
-
+	Delete() error
 	Select() ([]Sub, error)
 	Get() (*Sub, error)
 

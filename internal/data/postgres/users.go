@@ -14,27 +14,33 @@ import (
 	"gitlab.com/distributed_lab/kit/pgdb"
 )
 
-const usersTableName = "users"
+const (
+	usersTableName       = "users"
+	usersIdColumn        = usersTableName + ".id"
+	usersUsernameColumn  = usersTableName + ".username"
+	usersGithubIdColumn  = usersTableName + ".github_id"
+	usersUpdatedAtColumn = usersTableName + ".updated_at"
+)
 
 type UsersQ struct {
-	db  *pgdb.DB
-	sql sq.SelectBuilder
+	db            *pgdb.DB
+	selectBuilder sq.SelectBuilder
+	deleteBuilder sq.DeleteBuilder
 }
-
-var selectedUsersTable = sq.Select("*").From(usersTableName)
 
 func NewUsersQ(db *pgdb.DB) data.Users {
 	return &UsersQ{
-		db:  db.Clone(),
-		sql: selectedUsersTable,
+		db:            db.Clone(),
+		selectBuilder: sq.Select("*").From(usersTableName),
+		deleteBuilder: sq.Delete(usersTableName),
 	}
 }
 
-func (q *UsersQ) New() data.Users {
+func (q UsersQ) New() data.Users {
 	return NewUsersQ(q.db)
 }
 
-func (q *UsersQ) Upsert(user data.User) error {
+func (q UsersQ) Upsert(user data.User) error {
 	clauses := structs.Map(user)
 
 	updateQuery := sq.Update(" ").
@@ -51,77 +57,55 @@ func (q *UsersQ) Upsert(user data.User) error {
 	return q.db.Exec(query)
 }
 
-func (q *UsersQ) GetById(id int64) (*data.User, error) {
-	query := q.sql.Where(sq.Eq{"id": id})
-
-	var result data.User
-	err := q.db.Get(&result, query)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-
-	return &result, err
-}
-
-func (q *UsersQ) GetByUsername(username string) (*data.User, error) {
-	query := q.sql.Where(sq.Eq{"username": username})
-
-	var result data.User
-	err := q.db.Get(&result, query)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-
-	return &result, err
-}
-
-func (q *UsersQ) GetByGithubId(githubId int64) (*data.User, error) {
-	query := q.sql.Where(sq.Eq{"github_id": githubId})
-
-	var result data.User
-	err := q.db.Get(&result, query)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-
-	return &result, err
-}
-
-func (q *UsersQ) Delete(githubId int64) error {
+func (q UsersQ) Delete() error {
 	var deleted []data.User
 
-	query := sq.Delete(usersTableName).
-		Where(sq.Eq{
-			"github_id": githubId,
-		}).
-		Suffix("RETURNING *")
-
-	err := q.db.Select(&deleted, query)
+	err := q.db.Select(&deleted, q.deleteBuilder.Suffix("RETURNING *"))
 	if err != nil {
 		return err
 	}
+
 	if len(deleted) == 0 {
-		return errors.Errorf("no rows with `%d` github id", githubId)
+		return errors.Errorf("no such data to delete")
 	}
 
 	return nil
 }
 
-func (q *UsersQ) FilterById(id *int64) data.Users {
-	stmt := sq.Eq{usersTableName + ".id": id}
+func (q UsersQ) FilterById(id *int64) data.Users {
+	equalId := sq.Eq{usersIdColumn: id}
+	if id != nil {
+		equalId = sq.Eq{usersIdColumn: *id}
+	}
 
-	q.sql = q.sql.Where(stmt)
+	q.selectBuilder = q.selectBuilder.Where(equalId)
+	q.deleteBuilder = q.deleteBuilder.Where(equalId)
 
 	return q
 }
 
-func (q *UsersQ) Get() (*data.User, error) {
+func (q UsersQ) FilterByGithubIds(githubIds ...int64) data.Users {
+	equalGithubIds := sq.Eq{usersGithubIdColumn: githubIds}
+
+	q.selectBuilder = q.selectBuilder.Where(equalGithubIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalGithubIds)
+
+	return q
+}
+
+func (q UsersQ) FilterByUsernames(usernames ...string) data.Users {
+	equalUsernames := sq.Eq{usersUsernameColumn: usernames}
+
+	q.selectBuilder = q.selectBuilder.Where(equalUsernames)
+	q.deleteBuilder = q.deleteBuilder.Where(equalUsernames)
+
+	return q
+}
+
+func (q UsersQ) Get() (*data.User, error) {
 	var result data.User
 
-	err := q.db.Get(&result, q.sql)
+	err := q.db.Get(&result, q.selectBuilder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -129,43 +113,46 @@ func (q *UsersQ) Get() (*data.User, error) {
 	return &result, err
 }
 
-func (q *UsersQ) Select() ([]data.User, error) {
+func (q UsersQ) Select() ([]data.User, error) {
 	var result []data.User
 
-	err := q.db.Select(&result, q.sql)
+	err := q.db.Select(&result, q.selectBuilder)
 
 	return result, err
 }
 
-func (q *UsersQ) Page(pageParams pgdb.OffsetPageParams) data.Users {
-	q.sql = pageParams.ApplyTo(q.sql, "username")
+func (q UsersQ) Page(pageParams pgdb.OffsetPageParams) data.Users {
+	q.selectBuilder = pageParams.ApplyTo(q.selectBuilder, "username")
 
 	return q
 }
 
-func (q *UsersQ) SearchBy(search string) data.Users {
+func (q UsersQ) SearchBy(search string) data.Users {
 	search = strings.Replace(search, " ", "%", -1)
 	search = fmt.Sprint("%", search, "%")
 
-	q.sql = q.sql.Where(sq.ILike{"username": search})
+	q.selectBuilder = q.selectBuilder.Where(sq.ILike{"username": search})
 	return q
 }
 
-func (q *UsersQ) Count() data.Users {
-	q.sql = sq.Select("COUNT (*)").From(usersTableName)
+func (q UsersQ) Count() data.Users {
+	q.selectBuilder = sq.Select("COUNT (*)").From(usersTableName)
 
 	return q
 }
 
-func (q *UsersQ) GetTotalCount() (int64, error) {
+func (q UsersQ) GetTotalCount() (int64, error) {
 	var count int64
-	err := q.db.Get(&count, q.sql)
+	err := q.db.Get(&count, q.selectBuilder)
 
 	return count, err
 }
 
-func (q *UsersQ) FilterByLowerTime(time time.Time) data.Users {
-	q.sql = q.sql.Where(sq.Lt{usersTableName + ".updated_at": time})
+func (q UsersQ) FilterByLowerTime(time time.Time) data.Users {
+	lowerTime := sq.Lt{usersUpdatedAtColumn: time}
+
+	q.selectBuilder = q.selectBuilder.Where(lowerTime)
+	q.deleteBuilder = q.deleteBuilder.Where(lowerTime)
 
 	return q
 }

@@ -3,10 +3,13 @@ package service
 import (
 	"context"
 	"sync"
+	"time"
 
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/receiver"
 	"gitlab.com/distributed_lab/acs/github-module/internal/registrator"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
 	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
@@ -28,6 +31,11 @@ func Run(cfg config.Config) {
 	wg := new(sync.WaitGroup)
 
 	logger.Info("Starting all available services...")
+
+	stopProcessQueue := make(chan struct{})
+	newPqueue := pqueue.NewPriorityQueue()
+	go newPqueue.ProcessQueue(5000, 1*time.Hour, stopProcessQueue)
+	ctx = handlers.CtxPQueue(newPqueue.(*pqueue.PriorityQueue), ctx)
 
 	for serviceName, service := range availableServices {
 		wg.Add(1)

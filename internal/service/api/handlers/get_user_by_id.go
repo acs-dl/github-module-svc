@@ -17,7 +17,7 @@ func GetUserById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := UsersQ(r).GetById(userId)
+	user, err := UsersQ(r).FilterById(&userId).Get()
 	if err != nil {
 		Log(r).WithError(err).Errorf("failed to get user with id `%d`", userId)
 		ape.RenderErr(w, problems.InternalError())
