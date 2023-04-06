@@ -173,11 +173,6 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 		hasParent := false
 		err := p.permissionsQ.FilterByGithubIds(permission.GithubId).
 			FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
-		//err := p.permissionsQ.UpdateHasParent(data.Permission{
-		//	HasParent: false,
-		//	GithubId:  permission.GithubId,
-		//	Link:      permission.Link,
-		//})
 		if err != nil {
 			p.log.Errorf("failed to update parent level")
 			return errors.Wrap(err, "failed to update parent level")
@@ -194,17 +189,15 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 
 	if parentPermission == nil {
 		//suppose that it means: that user is not in parent repo only in lower level
-		hasParent := false
-		err = p.permissionsQ.FilterByGithubIds(permission.GithubId).
-			FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
-		//err = p.permissionsQ.UpdateHasParent(data.Permission{
-		//	HasParent: false,
-		//	GithubId:  permission.GithubId,
-		//	Link:      permission.Link,
-		//})
+		err = p.createHigherLevelPermissions(permission)
 		if err != nil {
-			p.log.Errorf("failed to update parent level")
-			return errors.Wrap(err, "failed to update parent level")
+			return errors.Wrap(err, "failed to create higher parent permissions")
+		}
+
+		hasParent := false
+		err = p.permissionsQ.FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
+		if err != nil {
+			return errors.Wrap(err, "failed to update has parent")
 		}
 
 		return nil
