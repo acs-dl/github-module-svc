@@ -18,7 +18,7 @@ func (p *processor) sendUsers(uuid string, users []data.User) error {
 
 		permission, err := p.permissionsQ.
 			FilterByGithubIds(users[i].GithubId).
-			FilterByTime(users[i].CreatedAt).
+			FilterByGreaterTime(users[i].CreatedAt).
 			FilterByHasParent(false).
 			FilterByParentLinks([]string{}...).
 			Get()
@@ -48,7 +48,7 @@ func (p *processor) sendUsers(uuid string, users []data.User) error {
 	return nil
 }
 
-func (p *processor) sendDeleteUser(uuid string, user data.User) error {
+func (p *processor) SendDeleteUser(uuid string, user data.User) error {
 	unverifiedUsers := make([]data.UnverifiedUser, 0)
 
 	unverifiedUsers = append(unverifiedUsers, createUnverifiedUserFromModuleUser(user, ""))

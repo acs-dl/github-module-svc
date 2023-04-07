@@ -5,6 +5,9 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/github"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -23,21 +26,47 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	msg.Type, _, err = p.githubClient.FindType(msg.Link)
+	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.FindType), []any{any(msg.Link)}, pqueue.LowPriority)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get type for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to get type")
 	}
+	typeSub, ok := item.Response.Value.(*github.TypeSub)
+	if !ok {
+		return errors.Errorf("wrong response type")
+	}
+
+	if typeSub == nil {
+		p.log.WithError(err).Errorf("type not found for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "type not found")
+	}
+	msg.Type = typeSub.Type
 
 	if validation.Validate(msg.Type, validation.Required, validation.In(data.Organization, data.Repository)) != nil {
 		p.log.WithError(err).Errorf("unexpected link type `%s` for message action with id `%s`", msg.Type, msg.RequestId)
 		return errors.Wrap(err, "something wrong with link type")
 	}
 
-	users, err := p.githubClient.GetUsersFromApi(msg.Link, msg.Type)
+	item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.GetUsersFromApi), []any{any(msg.Link), any(msg.Type)}, pqueue.LowPriority)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get users from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting users from api")
+	}
+	users, ok := item.Response.Value.([]data.Permission)
+	if !ok {
+		return errors.Errorf("wrong response type")
 	}
 
 	usersToUnverified := make([]data.User, 0)
@@ -45,35 +74,43 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 	for _, user := range users {
 		//api doesn't return role for organization members
 		if msg.Type == data.Organization {
-			_, permission, err := p.githubClient.CheckOrgCollaborator(msg.Link, user.Username)
+			item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.CheckOrgCollaborator), []any{any(msg.Link), any(user.Username)}, pqueue.LowPriority)
+			if err != nil {
+				p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+				return errors.Wrap(err, "failed to add function in pqueue")
+			}
+
+			err = item.Response.Error
 			if err != nil {
 				p.log.WithError(err).Errorf("failed to get permission from api for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to get permission from api")
 			}
-			if permission == nil {
+			checkPermission, ok := item.Response.Value.(*github.CheckPermission)
+			if !ok {
+				return errors.Errorf("wrong response type")
+			}
+			if checkPermission == nil {
 				p.log.Errorf("something went wrong with getting permission for message action with id `%s`", msg.RequestId)
 				return errors.Errorf("something went wrong with getting permission from api")
 			}
-			user.AccessLevel = permission.AccessLevel
-		}
 
-		dbUser := data.User{
-			Username:  user.Username,
-			GithubId:  user.GithubId,
-			CreatedAt: time.Now(),
-			AvatarUrl: user.AvatarUrl,
+			user.AccessLevel = checkPermission.Permission.AccessLevel
 		}
-		usersToUnverified = append(usersToUnverified, dbUser)
 
 		err = p.managerQ.Transaction(func() error {
-			if err = p.usersQ.Upsert(dbUser); err != nil {
+			if err = p.usersQ.Upsert(data.User{
+				Username:  user.Username,
+				GithubId:  user.GithubId,
+				CreatedAt: time.Now(),
+				AvatarUrl: user.AvatarUrl,
+			}); err != nil {
 				p.log.WithError(err).Errorf("failed to create user in user db for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to create user in user db")
 			}
 
 			p.resetFilters()
 
-			usrDb, err := p.usersQ.GetByUsername(user.Username)
+			usrDb, err := p.usersQ.FilterByUsernames(user.Username).Get()
 			if err != nil {
 				p.log.WithError(err).Errorf("failed to get user form user db for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to get user from user db")
@@ -82,6 +119,8 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				p.log.Errorf("no user with such username `%s` for message action with id `%s`", user.Username, msg.RequestId)
 				return errors.Wrap(err, "no user with such username")
 			}
+
+			usersToUnverified = append(usersToUnverified, *usrDb)
 
 			user.UserId = usrDb.Id
 			user.Link = msg.Link
@@ -131,11 +170,9 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 
 func (p *processor) checkHasParent(permission data.Sub) error {
 	if permission.ParentId == nil {
-		err := p.permissionsQ.UpdateHasParent(data.Permission{
-			HasParent: false,
-			GithubId:  permission.GithubId,
-			Link:      permission.Link,
-		})
+		hasParent := false
+		err := p.permissionsQ.FilterByGithubIds(permission.GithubId).
+			FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
 		if err != nil {
 			p.log.Errorf("failed to update parent level")
 			return errors.Wrap(err, "failed to update parent level")
@@ -152,22 +189,21 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 
 	if parentPermission == nil {
 		//suppose that it means: that user is not in parent repo only in lower level
-		err = p.permissionsQ.UpdateHasParent(data.Permission{
-			HasParent: false,
-			GithubId:  permission.GithubId,
-			Link:      permission.Link,
-		})
+		err = p.createHigherLevelPermissions(permission)
 		if err != nil {
-			p.log.Errorf("failed to update parent level")
-			return errors.Wrap(err, "failed to update parent level")
+			return errors.Wrap(err, "failed to create higher parent permissions")
+		}
+
+		hasParent := false
+		err = p.permissionsQ.FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
+		if err != nil {
+			return errors.Wrap(err, "failed to update has parent")
 		}
 
 		return nil
 	}
 
-	err = p.permissionsQ.UpdateParentLink(data.Permission{
-		GithubId:   permission.GithubId,
-		Link:       permission.Link,
+	err = p.permissionsQ.FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).Update(data.PermissionToUpdate{
 		ParentLink: &parentPermission.Link,
 	})
 	if err != nil {
@@ -179,21 +215,17 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 		return nil
 	}
 
-	err = p.permissionsQ.UpdateHasParent(data.Permission{
-		HasParent: false,
-		GithubId:  permission.GithubId,
-		Link:      permission.Link,
-	})
+	hasParent := false
+	err = p.permissionsQ.FilterByGithubIds(permission.GithubId).
+		FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
 	if err != nil {
 		p.log.Errorf("failed to update parent level")
 		return errors.Wrap(err, "failed to update parent level")
 	}
 
-	err = p.permissionsQ.UpdateHasChild(data.Permission{
-		HasChild: true,
-		GithubId: parentPermission.GithubId,
-		Link:     parentPermission.Link,
-	})
+	hasChild := true
+	err = p.permissionsQ.FilterByGithubIds(parentPermission.GithubId).
+		FilterByLinks(parentPermission.Link).Update(data.PermissionToUpdate{HasChild: &hasChild})
 	if err != nil {
 		p.log.Errorf("failed to update parent level")
 		return errors.Wrap(err, "failed to update parent level")

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3"
@@ -19,6 +20,7 @@ const (
 	linksCtxKey
 	paramsCtxKey
 	subsCtxKey
+	pqueueCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -79,4 +81,12 @@ func CtxSubsQ(entry data.Subs) func(context.Context) context.Context {
 	return func(ctx context.Context) context.Context {
 		return context.WithValue(ctx, subsCtxKey, entry)
 	}
+}
+
+func PQueue(ctx context.Context) *pqueue.PriorityQueue {
+	return ctx.Value(pqueueCtxKey).(*pqueue.PriorityQueue)
+}
+
+func CtxPQueue(entry *pqueue.PriorityQueue, ctx context.Context) context.Context {
+	return context.WithValue(ctx, pqueueCtxKey, entry)
 }

@@ -10,19 +10,17 @@ type Users interface {
 	New() Users
 
 	Upsert(user User) error
-	Delete(githubId int64) error
-
+	Delete() error
 	Select() ([]User, error)
 	Get() (*User, error)
 
 	Count() Users
 	GetTotalCount() (int64, error)
 
-	GetById(id int64) (*User, error)
-	GetByUsername(username string) (*User, error)
-	GetByGithubId(githubId int64) (*User, error)
-
 	FilterById(id *int64) Users
+	FilterByUsernames(usernames ...string) Users
+	FilterByGithubIds(githubIds ...int64) Users
+	FilterByLowerTime(time time.Time) Users
 	SearchBy(search string) Users
 
 	Page(pageParams pgdb.OffsetPageParams) Users
@@ -34,6 +32,8 @@ type User struct {
 	GithubId  int64     `json:"id" db:"github_id" structs:"github_id"`
 	AvatarUrl string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
 	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"-"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at" structs:"-"`
+	Submodule *string   `json:"-" db:"-" structs:"-"`
 }
 
 type UnverifiedUser struct {

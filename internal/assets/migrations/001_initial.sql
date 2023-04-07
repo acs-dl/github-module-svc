@@ -13,6 +13,7 @@ create table if not exists users (
     id bigint unique,
     username text not null unique,
     avatar_url text not null,
+    updated_at timestamp with time zone not null default current_timestamp,
     created_at timestamp with time zone default current_timestamp
 );
 
@@ -27,6 +28,7 @@ create table if not exists links (
 );
 insert into links (link) values ('mhrynenko/testapi');
 insert into links (link) values ('acstestapi');
+insert into links (link) values ('testapiacsdl');
 
 create index if not exists links_link_idx on links(link);
 
@@ -54,7 +56,7 @@ create table if not exists permissions (
     type text not null,
     created_at timestamp without time zone not null,
     expires_at timestamp without time zone not null,
-    updated_at timestamp without time zone not null default current_timestamp,
+    updated_at timestamp with time zone not null default current_timestamp,
     has_parent boolean not null default true,
     has_child boolean not null default false,
     parent_link text,

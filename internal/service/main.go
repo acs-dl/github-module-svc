@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"sync"
+	"time"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/receiver"
+	"gitlab.com/distributed_lab/acs/github-module/internal/registrator"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/registrator"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
 	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
@@ -16,24 +18,24 @@ import (
 )
 
 var availableServices = map[string]types.Runner{
-	"api":      api.Run,
-	"sender":   sender.Run,
-	"receiver": receiver.Run,
-	"worker":   worker.Run,
+	"api":       api.Run,
+	"sender":    sender.Run,
+	"receiver":  receiver.Run,
+	"worker":    worker.Run,
+	"registrar": registrator.Run,
 }
 
 func Run(cfg config.Config) {
-	// module registration before starting all services
-	regCfg := cfg.Registrator()
-	if err := registrator.RegisterModule(data.ModuleName, regCfg); err != nil {
-		panic(err)
-	}
-
 	logger := cfg.Log().WithField("service", "main")
 	ctx := context.Background()
 	wg := new(sync.WaitGroup)
 
 	logger.Info("Starting all available services...")
+
+	stopProcessQueue := make(chan struct{})
+	newPqueue := pqueue.NewPriorityQueue()
+	go newPqueue.ProcessQueue(5000, 1*time.Hour, stopProcessQueue)
+	ctx = handlers.CtxPQueue(newPqueue.(*pqueue.PriorityQueue), ctx)
 
 	for serviceName, service := range availableServices {
 		wg.Add(1)

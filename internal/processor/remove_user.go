@@ -3,6 +3,9 @@ package processor
 import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/github"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -22,7 +25,7 @@ func (p *processor) handleRemoveUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	dbUser, err := p.usersQ.GetByUsername(msg.Username)
+	dbUser, err := p.usersQ.FilterByUsernames(msg.Username).Get()
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get user from user db for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to get user from user db")
@@ -33,47 +36,82 @@ func (p *processor) handleRemoveUserAction(msg data.ModulePayload) error {
 		return errors.New("no user with such username")
 	}
 
-	_, githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
+	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
 	if err != nil {
-		p.log.WithError(err).Errorf("failed to get github id from API for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "some error while getting github id from api")
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
 	}
 
-	msg.Type, _, err = p.githubClient.FindType(msg.Link)
+	err = item.Response.Error
 	if err != nil {
+		p.log.WithError(err).Errorf("failed to get user from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "some error while getting user from api")
+	}
+	userApi, err := p.convertUserFromInterfaceAndCheck(item.Response.Value)
+	if err != nil {
+		p.log.WithError(err).Errorf("something wrong with user for message action with id `%s`", msg.RequestId)
+		return errors.Errorf("something wrong with user from api")
+	}
+
+	item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.FindType), []any{any(msg.Link)}, pqueue.LowPriority)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to get type for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to get type")
 	}
+	typeSub, ok := item.Response.Value.(*github.TypeSub)
+	if !ok {
+		return errors.Errorf("wrong response type")
+	}
+
+	if typeSub == nil {
+		p.log.WithError(err).Errorf("type not found for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "type not found")
+	}
+	msg.Type = typeSub.Type
 
 	if validation.Validate(msg.Type, validation.In(data.Organization, data.Repository)) != nil {
 		return errors.Wrap(err, "something wrong with link type")
 	}
 
-	err = p.githubClient.RemoveUserFromApi(msg.Link, msg.Username, msg.Type)
+	item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.RemoveUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.Type)}, pqueue.NormalPriority)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to remove user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while removing user from api")
 	}
 
 	err = p.managerQ.Transaction(func() error {
-		if err = p.permissionsQ.Delete(*githubId, msg.Type, msg.Link); err != nil {
+		err = p.permissionsQ.FilterByGithubIds(userApi.GithubId).FilterByLinks(msg.Link).FilterByTypes(msg.Type).Delete()
+		if err != nil {
 			p.log.WithError(err).Errorf("failed to delete user from db for message action with id `%s`", msg.RequestId)
 		}
 
-		permissions, err := p.permissionsQ.FilterByGithubIds(*githubId).Select()
+		permissions, err := p.permissionsQ.FilterByGithubIds(userApi.GithubId).Select()
 		if err != nil {
-			p.log.WithError(err).Errorf("failed to select permissions by github id `%d` for message action with id `%s`", *githubId, msg.RequestId)
+			p.log.WithError(err).Errorf("failed to select permissions by github id `%d` for message action with id `%s`", userApi.GithubId, msg.RequestId)
 			return errors.Wrap(err, "failed to select permissions")
 		}
 
 		if len(permissions) == 0 {
-			err = p.usersQ.Delete(*githubId)
+			err = p.usersQ.FilterByGithubIds(userApi.GithubId).Delete()
 			if err != nil {
-				p.log.WithError(err).Errorf("failed to delete user by telegram id `%d` for message action with id `%s`", *githubId, msg.RequestId)
+				p.log.WithError(err).Errorf("failed to delete user by telegram id `%d` for message action with id `%s`", userApi.GithubId, msg.RequestId)
 				return errors.Wrap(err, "failed to delete user")
 			}
 
 			if dbUser.Id == nil {
-				err = p.sendDeleteUser(msg.RequestId, *dbUser)
+				err = p.SendDeleteUser(msg.RequestId, *dbUser)
 				if err != nil {
 					p.log.WithError(err).Errorf("failed to publish delete user for message action with id `%s`", msg.RequestId)
 					return errors.Wrap(err, "failed to publish delete user")

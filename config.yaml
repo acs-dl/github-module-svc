@@ -11,7 +11,7 @@ amqp:
   subscriber: "amqp://guest:guest@localhost:5672/" #github_receiver
 
 github: #access token for superuser
-  token: "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"
+  token: "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"
 
 listener:
   addr: :7005
@@ -22,6 +22,7 @@ registrator:
   topic: "github" #MODULE topic
   title: "Github" #MODULE title
   prefix: "https://github.com"
+  is_module: true
 
 jwt:
   secret: SuPeR SeCrEt PhRaSe
