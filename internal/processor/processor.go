@@ -1,13 +1,17 @@
 package processor
 
 import (
+	"context"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/manager"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -40,6 +44,7 @@ type processor struct {
 	usersQ       data.Users
 	managerQ     *manager.Manager
 	sender       *sender.Sender
+	pqueue       *pqueue.PriorityQueue
 }
 
 var handleActions = map[string]func(proc *processor, msg data.ModulePayload) error{
@@ -51,7 +56,7 @@ var handleActions = map[string]func(proc *processor, msg data.ModulePayload) err
 	DeleteUserAction: (*processor).handleDeleteUserAction,
 }
 
-func NewProcessor(cfg config.Config) Processor {
+func NewProcessor(cfg config.Config, ctx context.Context) Processor {
 	return &processor{
 		log:          cfg.Log().WithField("service", serviceName),
 		githubClient: github.NewGithub(cfg.Github().Token, cfg.Log().WithField("service", serviceName)),
@@ -60,6 +65,7 @@ func NewProcessor(cfg config.Config) Processor {
 		usersQ:       postgres.NewUsersQ(cfg.DB()),
 		managerQ:     manager.NewManager(cfg.DB()),
 		sender:       sender.NewSender(cfg),
+		pqueue:       handlers.PQueue(ctx),
 	}
 }
 

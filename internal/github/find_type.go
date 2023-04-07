@@ -10,24 +10,24 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func (g *github) FindType(link string) (string, *data.Sub, error) {
+func (g *github) FindType(link string) (*TypeSub, error) {
 	repo, err := g.GetRepoFromApi(link)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	if repo != nil {
-		return data.Repository, repo, err
+		return &TypeSub{data.Repository, *repo}, err
 	}
 
 	org, err := g.GetOrgFromApi(link)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	if org != nil {
-		return data.Organization, org, nil
+		return &TypeSub{data.Organization, *org}, nil
 	}
 
-	return "", nil, nil
+	return nil, errors.Errorf("failed to check type for `%s`", link)
 }
 
 func (g *github) GetRepoFromApi(link string) (*data.Sub, error) {

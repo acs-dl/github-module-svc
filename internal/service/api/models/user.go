@@ -18,6 +18,7 @@ func NewUserModel(user data.User, id int) resources.User {
 			Username:  user.Username,
 			Module:    data.ModuleName,
 			CreatedAt: &user.CreatedAt,
+			Submodule: user.Submodule,
 		},
 	}
 

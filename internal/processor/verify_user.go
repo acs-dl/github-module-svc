@@ -6,6 +6,8 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
@@ -31,10 +33,26 @@ func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to parse user id")
 	}
 
-	userApi, githubId, err := p.githubClient.GetUserIdFromApi(msg.Username)
+	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
 	if err != nil {
-		p.log.WithError(err).Errorf("failed to get user id from API for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "some error while getting user id from api")
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to get user from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "some error while getting user from api")
+	}
+	userApi, err := p.convertUserFromInterfaceAndCheck(item.Response.Value)
+	if err != nil {
+		p.log.WithError(err).Errorf("something wrong with user for message action with id `%s`", msg.RequestId)
+		return errors.Errorf("something wrong with user from api")
+	}
+
+	if userApi == nil {
+		p.log.WithError(err).Errorf("user not found from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "user not found from api")
 	}
 
 	user := data.User{
@@ -51,7 +69,7 @@ func (p *processor) handleVerifyUserAction(msg data.ModulePayload) error {
 			return errors.Wrap(err, "failed to upsert user in user db")
 		}
 
-		if err = p.permissionsQ.UpdateUserId(data.Permission{UserId: &userId, GithubId: *githubId}); err != nil {
+		if err = p.permissionsQ.FilterByGithubIds(userApi.GithubId).Update(data.PermissionToUpdate{UserId: &userId}); err != nil {
 			p.log.WithError(err).Errorf("failed to update user id in permission db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to update user id in user db")
 		}

@@ -13,6 +13,8 @@ type UserAttributes struct {
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	// module name
 	Module string `json:"module"`
+	// submodule name
+	Submodule *string `json:"submodule,omitempty"`
 	// user id from identity module, if user is not verified - null
 	UserId *int64 `json:"user_id,omitempty"`
 	// username from gitlab

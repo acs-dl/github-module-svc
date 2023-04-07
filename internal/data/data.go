@@ -38,6 +38,7 @@ type UnverifiedPayload struct {
 }
 
 var Roles = map[string]string{
+	"":         "No access",
 	"read":     "Read",
 	"triage":   "Triage",
 	"write":    "Write",
