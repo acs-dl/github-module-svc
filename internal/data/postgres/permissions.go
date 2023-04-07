@@ -11,103 +11,74 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-const permissionsTableName = "permissions"
+const (
+	permissionsTableName         = "permissions"
+	permissionsRequestIdColumn   = permissionsTableName + ".request_id"
+	permissionsUserIdColumn      = permissionsTableName + ".user_id"
+	permissionsUsernameColumn    = permissionsTableName + ".username"
+	permissionsGithubIdColumn    = permissionsTableName + ".github_id"
+	permissionsLinkColumn        = permissionsTableName + ".link"
+	permissionsAccessLevelColumn = permissionsTableName + ".access_level"
+	permissionsTypeColumn        = permissionsTableName + ".type"
+	permissionsCreatedAtColumn   = permissionsTableName + ".created_at"
+	permissionsExpiresAtColumn   = permissionsTableName + ".expires_at"
+	permissionsUpdatedAtColumn   = permissionsTableName + ".updated_at"
+	permissionsParentLinkColumn  = permissionsTableName + ".parent_link"
+	permissionsHasParentColumn   = permissionsTableName + ".has_parent"
+	permissionsHasChildColumn    = permissionsTableName + ".has_child"
+)
 
 type PermissionsQ struct {
-	db  *pgdb.DB
-	sql sq.SelectBuilder
+	db            *pgdb.DB
+	selectBuilder sq.SelectBuilder
+	deleteBuilder sq.DeleteBuilder
+	updateBuilder sq.UpdateBuilder
 }
 
 var permissionsColumns = []string{
-	permissionsTableName + ".request_id",
-	permissionsTableName + ".user_id",
-	permissionsTableName + ".username",
-	permissionsTableName + ".github_id",
-	permissionsTableName + ".link",
-	permissionsTableName + ".access_level",
-	permissionsTableName + ".type",
-	permissionsTableName + ".parent_link",
+	permissionsRequestIdColumn,
+	permissionsUserIdColumn,
+	permissionsUsernameColumn,
+	permissionsGithubIdColumn,
+	permissionsLinkColumn,
+	permissionsAccessLevelColumn,
+	permissionsTypeColumn,
+	permissionsCreatedAtColumn,
+	permissionsUpdatedAtColumn,
+	permissionsExpiresAtColumn,
+	permissionsHasParentColumn,
+	permissionsHasChildColumn,
+	permissionsParentLinkColumn,
 }
 
 func NewPermissionsQ(db *pgdb.DB) data.Permissions {
 	return &PermissionsQ{
-		db:  db.Clone(),
-		sql: sq.Select(permissionsColumns...).From(permissionsTableName),
+		db:            db.Clone(),
+		selectBuilder: sq.Select(permissionsColumns...).From(permissionsTableName),
+		deleteBuilder: sq.Delete(permissionsTableName),
+		updateBuilder: sq.Update(permissionsTableName),
 	}
 }
 
-func (q *PermissionsQ) New() data.Permissions {
+func (q PermissionsQ) New() data.Permissions {
 	return NewPermissionsQ(q.db)
 }
 
-func (q *PermissionsQ) Create(permission data.Permission) error {
-	clauses := structs.Map(permission)
+func (q PermissionsQ) Update(permission data.PermissionToUpdate) error {
+	q.updateBuilder = q.updateBuilder.SetMap(structs.Map(permission))
 
-	query := sq.Insert(permissionsTableName).SetMap(clauses)
-
-	return q.db.Exec(query)
+	return q.db.Exec(q.updateBuilder)
 }
 
-func (q *PermissionsQ) UpdateUsernameAccessLevel(permission data.Permission) error {
-	query := sq.Update(permissionsTableName).
-		Set("username", permission.Username).
-		Set("access_level", permission.AccessLevel).
-		Where(
-			sq.Eq{"github_id": permission.GithubId, "link": permission.Link})
-
-	return q.db.Exec(query)
-}
-
-func (q *PermissionsQ) UpdateUserId(permission data.Permission) error {
-	query := sq.Update(permissionsTableName).
-		Set("user_id", permission.UserId).
-		Where(sq.Eq{"github_id": permission.GithubId})
-
-	return q.db.Exec(query)
-}
-
-func (q *PermissionsQ) UpdateHasParent(permission data.Permission) error {
-	query := sq.Update(permissionsTableName).
-		Set("has_parent", permission.HasParent).
-		Where(sq.Eq{
-			"github_id": permission.GithubId,
-			"link":      permission.Link,
-		})
-
-	return q.db.Exec(query)
-}
-
-func (q *PermissionsQ) UpdateParentLink(permission data.Permission) error {
-	query := sq.Update(permissionsTableName).
-		Set("parent_link", permission.ParentLink).
-		Where(sq.Eq{
-			"github_id": permission.GithubId,
-			"link":      permission.Link,
-		})
-
-	return q.db.Exec(query)
-}
-
-func (q *PermissionsQ) UpdateHasChild(permission data.Permission) error {
-	query := sq.Update(permissionsTableName).
-		Set("has_child", permission.HasChild).
-		Where(sq.Eq{
-			"github_id": permission.GithubId,
-			"link":      permission.Link,
-		})
-
-	return q.db.Exec(query)
-}
-
-func (q *PermissionsQ) Select() ([]data.Permission, error) {
+func (q PermissionsQ) Select() ([]data.Permission, error) {
 	var result []data.Permission
 
-	err := q.db.Select(&result, q.sql)
+	err := q.db.Select(&result, q.selectBuilder)
 
 	return result, err
 }
 
-func (q *PermissionsQ) Upsert(permission data.Permission) error {
+func (q PermissionsQ) Upsert(permission data.Permission) error {
 	updateStmt, args := sq.Update(" ").
 		Set("updated_at", time.Now()).
 		Set("username", permission.Username).
@@ -119,10 +90,10 @@ func (q *PermissionsQ) Upsert(permission data.Permission) error {
 	return q.db.Exec(query)
 }
 
-func (q *PermissionsQ) Get() (*data.Permission, error) {
+func (q PermissionsQ) Get() (*data.Permission, error) {
 	var result data.Permission
 
-	err := q.db.Get(&result, q.sql)
+	err := q.db.Get(&result, q.selectBuilder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -130,77 +101,100 @@ func (q *PermissionsQ) Get() (*data.Permission, error) {
 	return &result, err
 }
 
-func (q *PermissionsQ) Delete(githubId int64, typeTo, link string) error {
+func (q PermissionsQ) Delete() error {
 	var deleted []data.Permission
 
-	query := sq.Delete(permissionsTableName).
-		Where(sq.Eq{
-			"github_id": githubId,
-			"type":      typeTo,
-			"link":      link,
-		}).
-		Suffix("RETURNING *")
-
-	err := q.db.Select(&deleted, query)
+	err := q.db.Select(&deleted, q.deleteBuilder.Suffix("RETURNING *"))
 	if err != nil {
 		return err
 	}
+
 	if len(deleted) == 0 {
-		return errors.Errorf("no rows with `%s` link", link)
+		return errors.Errorf("no such data to delete")
 	}
 
 	return nil
 }
 
-func (q *PermissionsQ) FilterByGithubIds(ids ...int64) data.Permissions {
-	stmt := sq.Eq{permissionsTableName + ".github_id": ids}
+func (q PermissionsQ) FilterByGithubIds(ids ...int64) data.Permissions {
+	equalGithubIds := sq.Eq{permissionsGithubIdColumn: ids}
 
-	q.sql = q.sql.Where(stmt)
-
-	return q
-}
-
-func (q *PermissionsQ) FilterByUsernames(usernames ...string) data.Permissions {
-	stmt := sq.Eq{permissionsTableName + ".username": usernames}
-
-	q.sql = q.sql.Where(stmt)
+	q.selectBuilder = q.selectBuilder.Where(equalGithubIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalGithubIds)
+	q.updateBuilder = q.updateBuilder.Where(equalGithubIds)
 
 	return q
 }
 
-func (q *PermissionsQ) FilterByLinks(links ...string) data.Permissions {
-	stmt := sq.Eq{permissionsTableName + ".link": links}
+func (q PermissionsQ) FilterByUsernames(usernames ...string) data.Permissions {
+	equalUsernames := sq.Eq{permissionsUsernameColumn: usernames}
 
-	q.sql = q.sql.Where(stmt)
+	q.selectBuilder = q.selectBuilder.Where(equalUsernames)
+	q.deleteBuilder = q.deleteBuilder.Where(equalUsernames)
+	q.updateBuilder = q.updateBuilder.Where(equalUsernames)
 
 	return q
 }
 
-func (q *PermissionsQ) FilterByParentLinks(parentLinks ...string) data.Permissions {
-	stmt := sq.Eq{permissionsTableName + ".parent_link": parentLinks}
+func (q PermissionsQ) FilterByLinks(links ...string) data.Permissions {
+	equalLinks := sq.Eq{permissionsLinkColumn: links}
+
+	q.selectBuilder = q.selectBuilder.Where(equalLinks)
+	q.deleteBuilder = q.deleteBuilder.Where(equalLinks)
+	q.updateBuilder = q.updateBuilder.Where(equalLinks)
+
+	return q
+}
+
+func (q PermissionsQ) FilterByTypes(types ...string) data.Permissions {
+	equalTypes := sq.Eq{permissionsTypeColumn: types}
+
+	q.selectBuilder = q.selectBuilder.Where(equalTypes)
+	q.deleteBuilder = q.deleteBuilder.Where(equalTypes)
+	q.updateBuilder = q.updateBuilder.Where(equalTypes)
+
+	return q
+}
+
+func (q PermissionsQ) FilterByParentLinks(parentLinks ...string) data.Permissions {
+	equalParentLinks := sq.Eq{permissionsParentLinkColumn: parentLinks}
 	if len(parentLinks) == 0 {
-		stmt = sq.Eq{permissionsTableName + ".parent_link": nil}
+		equalParentLinks = sq.Eq{permissionsParentLinkColumn: nil}
 	}
 
-	q.sql = q.sql.Where(stmt)
+	q.selectBuilder = q.selectBuilder.Where(equalParentLinks)
+	q.deleteBuilder = q.deleteBuilder.Where(equalParentLinks)
+	q.updateBuilder = q.updateBuilder.Where(equalParentLinks)
 
 	return q
 }
 
-func (q *PermissionsQ) FilterByHasParent(hasParent bool) data.Permissions {
-	q.sql = q.sql.Where(sq.Eq{permissionsTableName + ".has_parent": hasParent})
+func (q PermissionsQ) FilterByHasParent(hasParent bool) data.Permissions {
+	equalHasParent := sq.Eq{permissionsHasParentColumn: hasParent}
+
+	q.selectBuilder = q.selectBuilder.Where(equalHasParent)
+	q.deleteBuilder = q.deleteBuilder.Where(equalHasParent)
+	q.updateBuilder = q.updateBuilder.Where(equalHasParent)
 
 	return q
 }
 
-func (q *PermissionsQ) FilterByGreaterTime(time time.Time) data.Permissions {
-	q.sql = q.sql.Where(sq.Gt{permissionsTableName + ".updated_at": time})
+func (q PermissionsQ) FilterByGreaterTime(time time.Time) data.Permissions {
+	greaterTime := sq.Gt{permissionsUpdatedAtColumn: time}
+
+	q.selectBuilder = q.selectBuilder.Where(greaterTime)
+	q.deleteBuilder = q.deleteBuilder.Where(greaterTime)
+	q.updateBuilder = q.updateBuilder.Where(greaterTime)
 
 	return q
 }
 
-func (q *PermissionsQ) FilterByLowerTime(time time.Time) data.Permissions {
-	q.sql = q.sql.Where(sq.Lt{permissionsTableName + ".updated_at": time})
+func (q PermissionsQ) FilterByLowerTime(time time.Time) data.Permissions {
+	lowerTime := sq.Lt{permissionsUpdatedAtColumn: time}
+
+	q.selectBuilder = q.selectBuilder.Where(lowerTime)
+	q.deleteBuilder = q.deleteBuilder.Where(lowerTime)
+	q.updateBuilder = q.updateBuilder.Where(lowerTime)
 
 	return q
 }

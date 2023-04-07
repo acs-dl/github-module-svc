@@ -10,19 +10,16 @@ type Users interface {
 	New() Users
 
 	Upsert(user User) error
-	Delete(githubId int64) error
-
+	Delete() error
 	Select() ([]User, error)
 	Get() (*User, error)
 
 	Count() Users
 	GetTotalCount() (int64, error)
 
-	GetById(id int64) (*User, error)
-	GetByUsername(username string) (*User, error)
-	GetByGithubId(githubId int64) (*User, error)
-
 	FilterById(id *int64) Users
+	FilterByUsernames(usernames ...string) Users
+	FilterByGithubIds(githubIds ...int64) Users
 	FilterByLowerTime(time time.Time) Users
 	SearchBy(search string) Users
 

@@ -8,66 +8,65 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/fatih/structs"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
 	"gitlab.com/distributed_lab/kit/pgdb"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-const subsTableName = "subs"
+const (
+	subsTableName      = "subs"
+	subsIdColumn       = subsTableName + ".id"
+	subsLinkColumn     = subsTableName + ".link"
+	subsPathColumn     = subsTableName + ".path"
+	subsTypeColumn     = subsTableName + ".type"
+	subsParentIdColumn = subsTableName + ".parent_id"
+)
 
 type SubsQ struct {
-	db  *pgdb.DB
-	sql sq.SelectBuilder
+	db            *pgdb.DB
+	selectBuilder sq.SelectBuilder
+	deleteBuilder sq.DeleteBuilder
 }
 
-var (
-	subsColumns = []string{
-		subsTableName + ".id",
-		subsTableName + ".link as subs_link",
-		subsTableName + ".path",
-		subsTableName + ".type as subs_type",
-		subsTableName + ".parent_id",
-	}
-	selectedSubsTable = sq.Select(subsColumns...).From(subsTableName)
-)
+var subsColumns = []string{
+	subsIdColumn,
+	subsLinkColumn + " as subs_link",
+	subsPathColumn,
+	subsTypeColumn + " as subs_type",
+	subsParentIdColumn,
+}
 
 func NewSubsQ(db *pgdb.DB) data.Subs {
 	return &SubsQ{
-		db:  db.Clone(),
-		sql: selectedSubsTable,
+		db:            db.Clone(),
+		selectBuilder: sq.Select(subsColumns...).From(subsTableName),
+		deleteBuilder: sq.Delete(subsTableName),
 	}
 }
 
-func (q *SubsQ) New() data.Subs {
+func (q SubsQ) New() data.Subs {
 	return NewSubsQ(q.db)
 }
 
-func (q *SubsQ) Insert(sub data.Sub) error {
-	clauses := structs.Map(sub)
-
-	query := sq.Insert(subsTableName).SetMap(clauses)
-
-	return q.db.Exec(query)
-}
-
-func (q *SubsQ) Upsert(sub data.Sub) error {
+func (q SubsQ) Upsert(sub data.Sub) error {
 	query := sq.Insert(subsTableName).SetMap(structs.Map(sub)).
 		Suffix(fmt.Sprintf("ON CONFLICT DO NOTHING"))
 
 	return q.db.Exec(query)
 }
 
-func (q *SubsQ) Select() ([]data.Sub, error) {
+func (q SubsQ) Select() ([]data.Sub, error) {
 	var result []data.Sub
 
-	err := q.db.Select(&result, q.sql)
+	err := q.db.Select(&result, q.selectBuilder)
 
 	return result, err
 }
 
-func (q *SubsQ) Get() (*data.Sub, error) {
+func (q SubsQ) Get() (*data.Sub, error) {
 	var result data.Sub
 
-	err := q.db.Get(&result, q.sql)
+	err := q.db.Get(&result, q.selectBuilder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -75,134 +74,144 @@ func (q *SubsQ) Get() (*data.Sub, error) {
 	return &result, err
 }
 
-func (q *SubsQ) Delete(subId int64, typeTo, link string) error {
+func (q SubsQ) Delete() error {
 	var deleted []data.Sub
 
-	query := sq.Delete(subsTableName).
-		Where(sq.Eq{
-			"id":   subId,
-			"type": typeTo,
-			"link": link,
-		}).
-		Suffix("RETURNING *")
-
-	err := q.db.Select(&deleted, query)
+	err := q.db.Select(&deleted, q.deleteBuilder.Suffix("RETURNING *"))
 	if err != nil {
 		return err
 	}
+
 	if len(deleted) == 0 {
-		return errors.Errorf("no rows with `%s` link", link)
+		return errors.Errorf("no such data to delete")
 	}
 
 	return nil
 }
 
-func (q *SubsQ) FilterByParentLinks(parentLinks ...string) data.Subs {
-	stmt := sq.Eq{permissionsTableName + ".parent_link": parentLinks}
+func (q SubsQ) WithPermissions() data.Subs {
+	q.selectBuilder = sq.Select().
+		Columns(helpers.RemoveDuplicateColumn(append(subsColumns, permissionsColumns...))...).
+		From(subsTableName).
+		LeftJoin(permissionsTableName + " ON " + permissionsLinkColumn + " = " + subsLinkColumn).
+		Where(sq.NotEq{permissionsRequestIdColumn: nil})
+
+	return q
+}
+
+func (q SubsQ) CountWithPermissions() data.Subs {
+	q.selectBuilder = sq.Select("COUNT(*)").
+		From(subsTableName).
+		LeftJoin(permissionsTableName + " ON " + permissionsLinkColumn + " = " + subsLinkColumn).
+		Where(sq.NotEq{permissionsRequestIdColumn: nil})
+
+	return q
+}
+
+func (q SubsQ) FilterByParentLinks(parentLinks ...string) data.Subs {
+	equalParentLinks := sq.Eq{permissionsParentLinkColumn: parentLinks}
 	if len(parentLinks) == 0 {
-		stmt = sq.Eq{permissionsTableName + ".parent_link": nil}
+		equalParentLinks = sq.Eq{permissionsParentLinkColumn: nil}
 	}
 
-	q.sql = q.sql.Where(stmt)
+	q.selectBuilder = q.selectBuilder.Where(equalParentLinks)
+	q.deleteBuilder = q.deleteBuilder.Where(equalParentLinks)
 
 	return q
 }
 
-func (q *SubsQ) FilterByLinks(links ...string) data.Subs {
-	stmt := sq.Eq{subsTableName + ".link": links}
-
-	q.sql = q.sql.Where(stmt)
-
-	return q
-}
-
-func (q *SubsQ) FilterByIds(ids ...int64) data.Subs {
-	stmt := sq.Eq{subsTableName + ".id": ids}
-
-	q.sql = q.sql.Where(stmt)
-
-	return q
-}
-
-func (q *SubsQ) FilterByUserIds(userIds ...int64) data.Subs {
-	stmt := sq.Eq{permissionsTableName + ".user_id": userIds}
+func (q SubsQ) FilterByUserIds(userIds ...int64) data.Subs {
+	equalUserIds := sq.Eq{permissionsUserIdColumn: userIds}
 
 	if len(userIds) == 0 {
-		stmt = sq.Eq{permissionsTableName + ".user_id": nil}
+		equalUserIds = sq.Eq{permissionsUserIdColumn: nil}
 	}
 
-	q.sql = q.sql.Where(stmt)
+	q.selectBuilder = q.selectBuilder.Where(equalUserIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalUserIds)
 
 	return q
 }
 
-func (q *SubsQ) FilterByGithubIds(githubIds ...int64) data.Subs {
-	stmt := sq.Eq{permissionsTableName + ".github_id": githubIds}
+func (q SubsQ) FilterByGithubIds(githubIds ...int64) data.Subs {
+	equalGithubIds := sq.Eq{permissionsGithubIdColumn: githubIds}
 
-	q.sql = q.sql.Where(stmt)
-
-	return q
-}
-
-func (q *SubsQ) OrderBy(columns ...string) data.Subs {
-	q.sql = q.sql.OrderBy(columns...)
+	q.selectBuilder = q.selectBuilder.Where(equalGithubIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalGithubIds)
 
 	return q
 }
 
-func (q *SubsQ) WithPermissions() data.Subs {
-	q.sql = sq.Select().Columns(subsColumns...).
-		Columns(
-			permissionsTableName+".request_id", permissionsTableName+".user_id",
-			permissionsTableName+".username", permissionsTableName+".github_id",
-			permissionsTableName+".access_level", permissionsTableName+".has_child",
-			permissionsTableName+".expires_at", permissionsTableName+".parent_link").
-		From(subsTableName).
-		LeftJoin(fmt.Sprint(permissionsTableName, " ON ", permissionsTableName, ".link = ", subsTableName, ".link")).
-		Where(sq.NotEq{permissionsTableName + ".request_id": nil})
+func (q SubsQ) FilterByHasParent(hasParent bool) data.Subs {
+	equalHasParent := sq.Eq{permissionsHasParentColumn: hasParent}
+
+	q.selectBuilder = q.selectBuilder.Where(equalHasParent)
+	q.deleteBuilder = q.deleteBuilder.Where(equalHasParent)
 
 	return q
 }
 
-func (q *SubsQ) CountWithPermissions() data.Subs {
-	q.sql = sq.Select("COUNT(*)").From(subsTableName).
-		LeftJoin(fmt.Sprint(permissionsTableName, " ON ", permissionsTableName, ".link = ", subsTableName, ".link")).
-		Where(sq.NotEq{permissionsTableName + ".request_id": nil})
-
-	return q
-}
-
-func (q *SubsQ) SearchBy(search string) data.Subs {
+func (q SubsQ) SearchBy(search string) data.Subs {
 	search = strings.Replace(search, " ", "%", -1)
 	search = fmt.Sprint("%", search, "%")
 
-	q.sql = q.sql.Where(sq.ILike{"subs.path": search})
+	ilikeSearch := sq.ILike{subsPathColumn: search}
+
+	q.selectBuilder = q.selectBuilder.Where(ilikeSearch)
+	q.deleteBuilder = q.deleteBuilder.Where(ilikeSearch)
 
 	return q
 }
 
-func (q *SubsQ) FilterByHasParent(HasParent bool) data.Subs {
-	q.sql = q.sql.Where(sq.Eq{permissionsTableName + ".has_parent": HasParent})
+func (q SubsQ) FilterByLinks(links ...string) data.Subs {
+	equalLinks := sq.Eq{subsLinkColumn: links}
+
+	q.selectBuilder = q.selectBuilder.Where(equalLinks)
+	q.deleteBuilder = q.deleteBuilder.Where(equalLinks)
 
 	return q
 }
 
-func (q *SubsQ) Count() data.Subs {
-	q.sql = sq.Select("COUNT (*)").From(subsTableName)
+func (q SubsQ) FilterByTypes(types ...string) data.Subs {
+	equalTypes := sq.Eq{subsTypeColumn: types}
+
+	q.selectBuilder = q.selectBuilder.Where(equalTypes)
+	q.deleteBuilder = q.deleteBuilder.Where(equalTypes)
 
 	return q
 }
 
-func (q *SubsQ) GetTotalCount() (int64, error) {
+func (q SubsQ) FilterByIds(ids ...int64) data.Subs {
+	equalIds := sq.Eq{subsIdColumn: ids}
+
+	q.selectBuilder = q.selectBuilder.Where(equalIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalIds)
+
+	return q
+}
+
+func (q SubsQ) OrderBy(columns ...string) data.Subs {
+	q.selectBuilder = q.selectBuilder.OrderBy(columns...)
+
+	return q
+}
+
+func (q SubsQ) Count() data.Subs {
+	q.selectBuilder = sq.Select("COUNT (*)").From(subsTableName)
+
+	return q
+}
+
+func (q SubsQ) GetTotalCount() (int64, error) {
 	var count int64
 
-	err := q.db.Get(&count, q.sql)
+	err := q.db.Get(&count, q.selectBuilder)
 
 	return count, err
 }
 
-func (q *SubsQ) Page(pageParams pgdb.OffsetPageParams) data.Subs {
-	q.sql = pageParams.ApplyTo(q.sql, subsTableName+".link")
+func (q SubsQ) Page(pageParams pgdb.OffsetPageParams) data.Subs {
+	q.selectBuilder = pageParams.ApplyTo(q.selectBuilder, subsTableName+".link")
 
 	return q
 }
