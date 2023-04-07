@@ -3,15 +3,20 @@ package worker
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/google/uuid"
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/processor"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"gitlab.com/distributed_lab/running"
-	"time"
 )
 
 const serviceName = data.ModuleName + "-worker"
@@ -25,20 +30,22 @@ type worker struct {
 	processor    processor.Processor
 	githubClient github.GithubClient
 	linksQ       data.Links
-	subsQ        data.Subs
 	usersQ       data.Users
+	subsQ        data.Subs
 	permissionsQ data.Permissions
+	pqueue       *pqueue.PriorityQueue
 }
 
-func NewWorker(cfg config.Config) Worker {
+func NewWorker(cfg config.Config, ctx context.Context) Worker {
 	return &worker{
 		logger:       cfg.Log().WithField("runner", serviceName),
-		processor:    processor.NewProcessor(cfg),
-		githubClient: github.NewGithub(cfg.Github().Token),
+		processor:    processor.NewProcessor(cfg, ctx),
+		githubClient: github.NewGithub(cfg.Github().Token, cfg.Log().WithField("runner", serviceName)),
 		linksQ:       postgres.NewLinksQ(cfg.DB()),
 		subsQ:        postgres.NewSubsQ(cfg.DB()),
 		usersQ:       postgres.NewUsersQ(cfg.DB()),
 		permissionsQ: postgres.NewPermissionsQ(cfg.DB()),
+		pqueue:       handlers.PQueue(ctx),
 	}
 }
 
@@ -56,6 +63,8 @@ func (w *worker) Run(ctx context.Context) {
 
 func (w *worker) processPermissions(_ context.Context) error {
 	w.logger.Info("fetching links")
+
+	startTime := time.Now()
 
 	links, err := w.linksQ.Select()
 	if err != nil {
@@ -83,52 +92,88 @@ func (w *worker) processPermissions(_ context.Context) error {
 
 	}
 
-	err = w.createPermissions()
+	err = w.removeOldUsers(startTime)
 	if err != nil {
-		w.logger.Infof("failed to create permissions for subs")
-		return errors.Wrap(err, "failed to create permissions for subs")
+		w.logger.WithError(err).Errorf("failed to remove old users")
+		return errors.Wrap(err, "failed to remove old users")
 	}
 
-	err = w.checkHasParent()
+	err = w.removeOldPermissions(startTime)
 	if err != nil {
-		w.logger.Infof("failed to check parent levels for subs")
-		return errors.Wrap(err, "failed to check parent levels for for subs")
+		w.logger.WithError(err).Errorf("failed to remove old permissions")
+		return errors.Wrap(err, "failed to remove old permissions")
 	}
 
 	return nil
 }
 
-func (w *worker) createPermissions() error {
-	w.logger.Info("fetching subs")
+func (w *worker) removeOldUsers(borderTime time.Time) error {
+	w.logger.Infof("started removing old users")
 
-	subs, err := w.subsQ.Select()
+	users, err := w.usersQ.FilterByLowerTime(borderTime).Select()
 	if err != nil {
-		w.logger.Infof("failed to get subs")
-		return errors.Wrap(err, "failed to get subs")
+		w.logger.Infof("failed to select users")
+		return errors.Wrap(err, " failed to select users")
 	}
 
-	reqAmount := len(subs)
-	if reqAmount == 0 {
-		w.logger.Info("no subs were found")
-		return nil
-	}
+	w.logger.Infof("found `%d` users to delete", len(users))
 
-	w.logger.Infof("found %v subs", reqAmount)
-
-	for _, sub := range subs {
-		w.logger.Infof("processing sub `%s`", sub.Link)
-
-		if err = w.processor.HandleNewMessage(data.ModulePayload{
-			RequestId: "from-worker",
-			Action:    processor.GetUsersAction,
-			Link:      sub.Link,
-		}); err != nil {
-			w.logger.Infof("failed to get users sub `%s`", sub.Link)
-			return errors.Wrap(err, "failed to get users")
+	for _, user := range users {
+		if user.Id == nil { //if unverified user we need to remove them from `unverified-svc`
+			err = w.processor.SendDeleteUser(uuid.New().String(), user)
+			if err != nil {
+				w.logger.WithError(err).Errorf("failed to publish delete user")
+				return errors.Wrap(err, " failed to publish delete user")
+			}
 		}
 
-		w.logger.Infof("successfully processed sub `%s", sub.Link)
+		err = w.usersQ.FilterByGithubIds(user.GithubId).Delete()
+		if err != nil {
+			w.logger.Infof("failed to delete user with github id `%d`", user.GithubId)
+			return errors.Wrap(err, " failed to delete user")
+		}
 	}
+
+	w.logger.Infof("finished removing old users")
+	return nil
+}
+
+func (w *worker) removeOldPermissions(borderTime time.Time) error {
+	w.logger.Infof("started removing old permissions")
+
+	permissions, err := w.permissionsQ.FilterByLowerTime(borderTime).Select()
+	if err != nil {
+		w.logger.Infof("failed to select permissions")
+		return errors.Wrap(err, " failed to select permissions")
+	}
+
+	w.logger.Infof("found `%d` permissions to delete", len(permissions))
+
+	for _, permission := range permissions {
+		err = w.permissionsQ.FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).FilterByTypes(permission.Type).Delete()
+		if err != nil {
+			w.logger.Infof("failed to delete permission")
+			return errors.Wrap(err, " failed to delete permission")
+		}
+	}
+
+	w.logger.Infof("finished removing old permissions")
+	return nil
+}
+
+func (w *worker) createPermission(link string) error {
+	w.logger.Infof("processing sub `%s`", link)
+
+	if err := w.processor.HandleNewMessage(data.ModulePayload{
+		RequestId: "from-worker",
+		Action:    processor.GetUsersAction,
+		Link:      link,
+	}); err != nil {
+		w.logger.Infof("failed to get users sub `%s`", link)
+		return errors.Wrap(err, "failed to get users")
+	}
+
+	w.logger.Infof("successfully processed sub `%s", link)
 
 	return nil
 }
@@ -136,34 +181,50 @@ func (w *worker) createPermissions() error {
 func (w *worker) createSubs(link data.Link) error {
 	w.logger.Infof("creating subs for link `%s", link.Link)
 
-	typeTo, sub, err := w.githubClient.FindType(link.Link)
+	item, err := helpers.AddFunctionInPqueue(w.pqueue, any(w.githubClient.FindType), []any{any(link.Link)}, pqueue.LowPriority)
 	if err != nil {
-		w.logger.Infof("failed to get type for link `%s`", link.Link)
+		w.logger.WithError(err).Errorf("failed to add function in pqueue")
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
+	if err != nil {
+		w.logger.WithError(err).Errorf("failed to get type")
 		return errors.Wrap(err, "failed to get type")
 	}
-	if sub == nil {
+	typeSub, ok := item.Response.Value.(*github.TypeSub)
+	if !ok {
+		return errors.Errorf("wrong response type")
+	}
+
+	if typeSub == nil {
 		w.logger.Infof("failed to get sub for link `%s`", link.Link)
 		return errors.Wrap(err, "failed to get sub")
 	}
 
 	err = w.subsQ.Upsert(data.Sub{
-		Id:       sub.Id,
-		Path:     sub.Path,
-		Link:     sub.Link,
-		Type:     typeTo,
+		Id:       typeSub.Sub.Id,
+		Path:     typeSub.Sub.Path,
+		Link:     typeSub.Sub.Link,
+		Type:     typeSub.Type,
 		ParentId: nil,
-		Lpath:    fmt.Sprintf("%d", sub.Id),
 	})
 	if err != nil {
 		w.logger.Infof("failed to upsert sub for link `%s`", link.Link)
 		return errors.Wrap(err, "failed to upsert sub")
 	}
 
-	if typeTo == data.Repository {
+	err = w.createPermission(typeSub.Sub.Link)
+	if err != nil {
+		w.logger.Infof("failed to create permissions for sub with link `%s`", link.Link)
+		return errors.Wrap(err, "failed to create permissions for sub")
+	}
+
+	if typeSub.Type == data.Repository {
 		return nil
 	}
 
-	err = w.processNested(link.Link, sub.Id, fmt.Sprintf("%d", sub.Id))
+	err = w.processNested(link.Link, typeSub.Sub.Id)
 	if err != nil {
 		w.logger.Infof("failed to index subs for link `%s`", link.Link)
 		return errors.Wrap(err, "failed to index subs")
@@ -173,13 +234,24 @@ func (w *worker) createSubs(link data.Link) error {
 	return nil
 }
 
-func (w *worker) processNested(link string, parentId int64, parentLpath string) error {
+func (w *worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
+	
+	item, err := helpers.AddFunctionInPqueue(w.pqueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
+	if err != nil {
+		w.logger.WithError(err).Errorf("failed to add function in pqueue")
+		return errors.Wrap(err, "failed to add function in pqueue")
+	}
 
-	projects, err := w.githubClient.GetProjectsFromApi(link)
+	err = item.Response.Error
 	if err != nil {
 		w.logger.Infof("failed to get projects for link `%s`", link)
 		return errors.Wrap(err, fmt.Sprintf("failed to get projects for link `%s`", link))
+	}
+
+	projects, ok := item.Response.Value.([]data.Sub)
+	if !ok {
+		return errors.Errorf("wrong response type")
 	}
 
 	for _, project := range projects {
@@ -189,102 +261,18 @@ func (w *worker) processNested(link string, parentId int64, parentLpath string) 
 			Link:     link + "/" + project.Path,
 			Type:     data.Repository,
 			ParentId: &parentId,
-			Lpath:    fmt.Sprintf("%s.%d", parentLpath, project.Id),
 		})
 		if err != nil {
 			w.logger.Infof("failed to upsert sub with link `%s`", link+"/"+project.Path)
 			return errors.Wrap(err, fmt.Sprintf("failed to get upsert sub with link `%s`", link+"/"+project.Path))
 		}
-	}
 
-	return nil
-}
-
-func (w *worker) checkHasParent() error {
-	w.logger.Infof("started checking parent levels for subs")
-
-	users, err := w.usersQ.Select()
-	if err != nil {
-		w.logger.Errorf("failed to select users")
-		return errors.Wrap(err, "failed to select users")
-	}
-	if len(users) == 0 {
-		w.logger.Infof("no user was found")
-		return nil
-	}
-
-	w.logger.Infof("found `%v` users to check levels", len(users))
-	for _, user := range users {
-		permissions, err := w.subsQ.WithPermissions().FilterByGithubIds(user.GithubId).OrderBy("subs_link").Select()
+		err = w.createPermission(link + "/" + project.Path)
 		if err != nil {
-			w.logger.Errorf("failed to select permissions")
-			return errors.Wrap(err, "failed to select permissions")
+			w.logger.Infof("failed to create permissions for sub with link `%s`", link+"/"+project.Path)
+			return errors.Wrap(err, "failed to create permissions for sub")
 		}
-		if len(permissions) == 0 {
-			w.logger.Infof("no permission for user `%s` was found", user.Username)
-			continue
-		}
-
-		w.logger.Infof("found `%v` permissions for user `%s`", len(permissions), user.Username)
-		for _, permission := range permissions {
-			if permission.ParentId == nil {
-				err = w.permissionsQ.UpdateHasParent(data.Permission{
-					HasParent: false,
-					GithubId:  permission.GithubId,
-					Link:      permission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-				continue
-			}
-
-			parentPermission, err := w.subsQ.WithPermissions().FilterByGithubIds(user.GithubId).FilterByIds(*permission.ParentId).OrderBy("subs_link").Get()
-			if err != nil {
-				w.logger.Errorf("failed to get parent permission")
-				return errors.Wrap(err, "failed to get parent permission")
-			}
-
-			if parentPermission == nil {
-				//suppose that it means: that user is not in parent repo only in lower level
-				err = w.permissionsQ.UpdateHasParent(data.Permission{
-					HasParent: false,
-					GithubId:  permission.GithubId,
-					Link:      permission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-				continue
-			}
-
-			if permission.AccessLevel != parentPermission.AccessLevel {
-				err = w.permissionsQ.UpdateHasParent(data.Permission{
-					HasParent: false,
-					GithubId:  permission.GithubId,
-					Link:      permission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-
-				err = w.permissionsQ.UpdateHasChild(data.Permission{
-					HasChild: true,
-					GithubId: parentPermission.GithubId,
-					Link:     parentPermission.Link,
-				})
-				if err != nil {
-					w.logger.Errorf("failed to update parent level")
-					return errors.Wrap(err, "failed to update parent level")
-				}
-			}
-		}
-		w.logger.Infof("finished checking levels for user `%s`", user.Username)
 	}
 
-	w.logger.Infof("finished checking parent levels for subs")
 	return nil
 }

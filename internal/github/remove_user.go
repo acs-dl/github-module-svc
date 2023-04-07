@@ -2,9 +2,11 @@ package github
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
 
 func (g *github) RemoveUserFromApi(link, username, typeTo string) error {
@@ -25,6 +27,16 @@ func (g *github) RemoveUserFromApi(link, username, typeTo string) error {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, " error making http request")
+	}
+
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.RemoveUserFromApi(link, username, typeTo)
 	}
 
 	if res.StatusCode != 204 {

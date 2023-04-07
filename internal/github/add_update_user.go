@@ -4,96 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"net/http"
+	"time"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
-	"net/http"
 )
-
-func (g *github) AddUserFromApi(link, username, permission string) (*data.Permission, error) {
-	findType, _, err := g.FindType(link)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get type")
-	}
-
-	if err = validation.Validate(findType, validation.In(data.Organization, data.Repository)); err != nil {
-		return nil, errors.Wrap(err, "something wrong with link type")
-	}
-
-	switch findType {
-	case data.Repository:
-		isCollaborator, _, err := g.CheckRepoCollaborator(link, username)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if user in repo from api")
-		}
-
-		if isCollaborator {
-			return nil, errors.Errorf("such user is already in repository")
-		}
-
-		return g.AddOrUpdateUserInRepoFromApi(link, username, permission)
-	case data.Organization:
-		isCollaborator, _, err := g.CheckOrgCollaborator(link, username)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if user in org from api")
-		}
-
-		if isCollaborator {
-			return nil, errors.Errorf("such user is already in organisation")
-		}
-
-		return g.AddOrUpdateUserInOrgFromApi(link, username, permission)
-	default:
-		return nil, errors.Wrap(err, "unexpected type")
-	}
-}
-
-func (g *github) UpdateUserFromApi(link, username, permission string) (*data.Permission, error) {
-	findType, _, err := g.FindType(link)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get type")
-	}
-
-	if err = validation.Validate(findType, validation.In(data.Organization, data.Repository)); err != nil {
-		return nil, errors.Wrap(err, "something wrong with link type")
-	}
-
-	switch findType {
-	case data.Repository:
-		isCollaborator, _, err := g.CheckRepoCollaborator(link, username)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if user in repo from api")
-		}
-
-		if !isCollaborator {
-			return nil, errors.Errorf("such user is not in repository")
-		}
-
-		owned, err := g.FindRepoOwner(link)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if repository owner")
-		}
-
-		if owned == data.UserOwned {
-			permission = "write"
-		}
-
-		return g.AddOrUpdateUserInRepoFromApi(link, username, permission)
-	case data.Organization:
-		isCollaborator, _, err := g.CheckOrgCollaborator(link, username)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to check if user in org from api")
-		}
-
-		if !isCollaborator {
-			return nil, errors.Errorf("`%s` is not in organisation `%s`", username, link)
-		}
-
-		return g.AddOrUpdateUserInOrgFromApi(link, username, permission)
-	default:
-		return nil, errors.Errorf("unexpected type `%s`", findType)
-	}
-}
 
 func (g *github) AddOrUpdateUserInRepoFromApi(link, username, permission string) (*data.Permission, error) {
 	jsonBody, _ := json.Marshal(struct {
@@ -118,6 +34,16 @@ func (g *github) AddOrUpdateUserInRepoFromApi(link, username, permission string)
 
 	if res == nil {
 		return nil, errors.New("failed to process request: response is nil")
+	}
+
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.AddOrUpdateUserInRepoFromApi(link, username, permission)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
@@ -184,6 +110,16 @@ func (g *github) AddOrUpdateUserInOrgFromApi(link, username, permission string) 
 
 	if res == nil {
 		return nil, errors.New("failed to process request: response is nil")
+	}
+
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.AddOrUpdateUserInOrgFromApi(link, username, permission)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

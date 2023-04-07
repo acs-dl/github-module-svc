@@ -5,22 +5,20 @@ import "time"
 type Permissions interface {
 	New() Permissions
 
-	Create(user Permission) error
 	Upsert(permission Permission) error
-	Update(user Permission) error
-	UpdateUserId(permission Permission) error
-	UpdateHasParent(permission Permission) error
-	UpdateHasChild(permission Permission) error
-	Delete(githubId int64, typeTo, link string) error
-
-	JoinsModule() Permissions
+	Update(permission PermissionToUpdate) error
+	Delete() error
 	Select() ([]Permission, error)
 	Get() (*Permission, error)
 
-	FilterByUserIds(ids ...int64) Permissions
 	FilterByGithubIds(githubIds ...int64) Permissions
 	FilterByUsernames(usernames ...string) Permissions
 	FilterByLinks(links ...string) Permissions
+	FilterByTypes(types ...string) Permissions
+	FilterByGreaterTime(time time.Time) Permissions
+	FilterByLowerTime(time time.Time) Permissions
+	FilterByParentLinks(parentLinks ...string) Permissions
+	FilterByHasParent(hasParent bool) Permissions
 }
 
 type Permission struct {
@@ -33,8 +31,18 @@ type Permission struct {
 	HasChild    bool      `json:"-" db:"has_child" structs:"-"`
 	Link        string    `json:"link" db:"link" structs:"link"`
 	Type        string    `json:"type" db:"type" structs:"type"`
+	ParentLink  *string   `json:"-" db:"parent_link" structs:"parent_link"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at" structs:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at" structs:"-"`
 	ExpiresAt   time.Time `json:"expires_at" db:"expires_at" structs:"expires_at"`
 	AvatarUrl   string    `json:"avatar_url" db:"-" structs:"-"`
+}
+
+type PermissionToUpdate struct {
+	Username    *string `structs:"username,omitempty"`
+	AccessLevel *string `structs:"access_level,omitempty"`
+	UserId      *int64  `structs:"user_id,omitempty"`
+	ParentLink  *string `structs:"parent_link,omitempty"`
+	HasParent   *bool   `structs:"has_parent,omitempty"`
+	HasChild    *bool   `structs:"has_child,omitempty"`
 }

@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
-	"net/http"
 )
 
 func GetRoles(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +26,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	githubClient := github.NewGithub(Params(r).Token)
+	githubClient := github.NewGithub(Params(r).Token, Log(r))
 
 	if request.Username != nil {
 		permission, err := PermissionsQ(r).FilterByUsernames(*request.Username).FilterByLinks(*request.Link).Get()
@@ -35,10 +38,24 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		if permission != nil {
 			owned := data.OrganizationOwned
 			if permission.Type == data.Repository {
-				owned, err = githubClient.FindRepoOwner(*request.Link)
+				item, err := helpers.AddFunctionInPqueue(PQueue(r.Context()), any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
 				if err != nil {
-					Log(r).WithError(err).Infof("failed to get repo owner for `%s`", *request.Link)
-					ape.RenderErr(w, problems.BadRequest(err)...)
+					Log(r).WithError(err).Errorf("failed to add function in pqueue")
+					ape.RenderErr(w, problems.InternalError())
+					return
+				}
+
+				err = item.Response.Error
+				if err != nil {
+					Log(r).WithError(err).Errorf("some error while getting repo owner type")
+					ape.RenderErr(w, problems.InternalError())
+					return
+				}
+				var ok bool
+				owned, ok = item.Response.Value.(string)
+				if !ok {
+					Log(r).Errorf("wrong response type")
+					ape.RenderErr(w, problems.InternalError())
 					return
 				}
 			}
@@ -48,27 +65,53 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	findType, _, err := githubClient.FindType(*request.Link)
+	item, err := helpers.AddFunctionInPqueue(PQueue(r.Context()), any(githubClient.FindType), []any{any(*request.Link)}, pqueue.HighPriority)
+	if err != nil {
+		Log(r).WithError(err).Errorf("failed to add function in pqueue")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
+
+	err = item.Response.Error
 	if err != nil {
 		Log(r).WithError(err).Info("failed to get type")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
+	typeSub, ok := item.Response.Value.(*github.TypeSub)
+	if !ok {
+		Log(r).Errorf("wrong response type")
+		ape.RenderErr(w, problems.InternalError())
+		return
+	}
 
-	if findType == "" {
+	if typeSub == nil {
 		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
 		return
 	}
 
 	owned := data.OrganizationOwned
-	if findType == data.Repository {
-		owned, err = githubClient.FindRepoOwner(*request.Link)
+	if typeSub.Type == data.Repository {
+		item, err = helpers.AddFunctionInPqueue(PQueue(r.Context()), any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
+		if err != nil {
+			Log(r).WithError(err).Errorf("failed to add function in pqueue")
+			ape.RenderErr(w, problems.InternalError())
+			return
+		}
+
+		err = item.Response.Error
 		if err != nil {
 			Log(r).WithError(err).Infof("failed to get repo owner for `%s`", *request.Link)
 			ape.RenderErr(w, problems.BadRequest(err)...)
 			return
 		}
+		owned, ok = item.Response.Value.(string)
+		if !ok {
+			Log(r).Errorf("wrong response type")
+			ape.RenderErr(w, problems.InternalError())
+			return
+		}
 	}
 
-	ape.Render(w, models.NewRolesResponse(true, findType, owned, ""))
+	ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, ""))
 }

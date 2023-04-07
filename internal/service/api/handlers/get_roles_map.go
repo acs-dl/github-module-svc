@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/resources"
 	"gitlab.com/distributed_lab/ape"
-	"net/http"
 )
 
 func GetRolesMap(w http.ResponseWriter, r *http.Request) {

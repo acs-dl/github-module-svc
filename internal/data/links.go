@@ -4,10 +4,10 @@ type Links interface {
 	New() Links
 
 	Insert(link Link) error
-	Delete(link string) error
-
+	Delete() error
 	Get() (*Link, error)
 	Select() ([]Link, error)
+
 	FilterByLinks(links ...string) Links
 }
 

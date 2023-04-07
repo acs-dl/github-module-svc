@@ -3,7 +3,8 @@ package receiver
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"time"
+
 	"github.com/ThreeDotsLabs/watermill-amqp/v2/pkg/amqp"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
@@ -13,7 +14,6 @@ import (
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"gitlab.com/distributed_lab/running"
-	"time"
 )
 
 const serviceName = data.ModuleName + "-receiver"
@@ -26,12 +26,12 @@ type Receiver struct {
 	responseQ  data.Responses
 }
 
-func NewReceiver(cfg config.Config) *Receiver {
+func NewReceiver(cfg config.Config, ctx context.Context) *Receiver {
 	return &Receiver{
 		subscriber: cfg.Amqp().Subscriber,
 		topic:      cfg.Amqp().Topic,
 		log:        logan.New().WithField("service", serviceName),
-		processor:  processor.NewProcessor(cfg),
+		processor:  processor.NewProcessor(cfg, ctx),
 		responseQ:  postgres.NewResponsesQ(cfg.DB()),
 	}
 }
@@ -48,20 +48,7 @@ func (r *Receiver) Run(ctx context.Context) {
 
 func (r *Receiver) listenMessages(ctx context.Context) error {
 	r.log.Info("started listening messages")
-	r.startSubscriber(ctx, r.topic)
-	return nil
-}
-
-func (r *Receiver) startSubscriber(ctx context.Context, topic string) {
-	go running.WithBackOff(ctx, r.log,
-		fmt.Sprint(serviceName, "_", topic),
-		func(ctx context.Context) error {
-			return r.subscribeForTopic(ctx, topic)
-		},
-		30*time.Second,
-		30*time.Second,
-		30*time.Second,
-	)
+	return r.subscribeForTopic(ctx, r.topic)
 }
 
 func (r *Receiver) subscribeForTopic(ctx context.Context, topic string) error {
@@ -108,9 +95,10 @@ func (r *Receiver) processMessage(msg *message.Message) error {
 	}
 
 	err = r.responseQ.Insert(data.Response{
-		ID:     msg.UUID,
-		Status: responseStatus,
-		Error:  errMsg,
+		ID:      msg.UUID,
+		Status:  responseStatus,
+		Error:   errMsg,
+		Payload: json.RawMessage(msg.Payload),
 	})
 	if err != nil {
 		r.log.WithError(err).Errorf("failed to create response", msg.UUID)

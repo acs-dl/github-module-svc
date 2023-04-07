@@ -3,8 +3,10 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
+	"time"
+
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (g *github) FindRepoOwner(link string) (string, error) {
@@ -20,6 +22,16 @@ func (g *github) FindRepoOwner(link string) (string, error) {
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", errors.Wrap(err, " error making http request")
+	}
+
+	if res.StatusCode == http.StatusForbidden {
+		timeoutDuration, err := g.getDuration(res)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get time duration from response")
+		}
+		g.log.Warnf("we need to wait `%d`", timeoutDuration)
+		time.Sleep(timeoutDuration)
+		return g.FindRepoOwner(link)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

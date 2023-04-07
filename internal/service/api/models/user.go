@@ -1,9 +1,10 @@
 package models
 
 import (
+	"strconv"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/resources"
-	"strconv"
 )
 
 func NewUserModel(user data.User, id int) resources.User {
@@ -17,6 +18,7 @@ func NewUserModel(user data.User, id int) resources.User {
 			Username:  user.Username,
 			Module:    data.ModuleName,
 			CreatedAt: &user.CreatedAt,
+			Submodule: user.Submodule,
 		},
 	}
 

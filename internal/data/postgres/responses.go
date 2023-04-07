@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/fatih/structs"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
@@ -9,27 +10,32 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-const responsesTableName = "responses"
+const (
+	responsesTableName = "responses"
+	responsesIdColumn  = responsesTableName + ".id"
+)
 
 type ResponsesQ struct {
-	db  *pgdb.DB
-	sql sq.SelectBuilder
+	db            *pgdb.DB
+	selectBuilder sq.SelectBuilder
+	deleteBuilder sq.DeleteBuilder
 }
 
 var selectedResponsesTable = sq.Select("*").From(responsesTableName)
 
 func NewResponsesQ(db *pgdb.DB) data.Responses {
 	return &ResponsesQ{
-		db:  db.Clone(),
-		sql: selectedResponsesTable,
+		db:            db.Clone(),
+		selectBuilder: selectedResponsesTable,
+		deleteBuilder: sq.Delete(responsesTableName),
 	}
 }
 
-func (q *ResponsesQ) New() data.Responses {
+func (q ResponsesQ) New() data.Responses {
 	return NewResponsesQ(q.db)
 }
 
-func (q *ResponsesQ) Insert(response data.Response) error {
+func (q ResponsesQ) Insert(response data.Response) error {
 	clauses := structs.Map(response)
 
 	query := sq.Insert(responsesTableName).SetMap(clauses)
@@ -37,18 +43,18 @@ func (q *ResponsesQ) Insert(response data.Response) error {
 	return q.db.Exec(query)
 }
 
-func (q *ResponsesQ) Select() ([]data.Response, error) {
+func (q ResponsesQ) Select() ([]data.Response, error) {
 	var result []data.Response
 
-	err := q.db.Select(&result, q.sql)
+	err := q.db.Select(&result, q.selectBuilder)
 
 	return result, err
 }
 
-func (q *ResponsesQ) Get() (*data.Response, error) {
+func (q ResponsesQ) Get() (*data.Response, error) {
 	var result data.Response
 
-	err := q.db.Get(&result, q.sql)
+	err := q.db.Get(&result, q.selectBuilder)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -56,31 +62,26 @@ func (q *ResponsesQ) Get() (*data.Response, error) {
 	return &result, err
 }
 
-func (q *ResponsesQ) Delete(id string) error {
-	query := sq.Delete(responsesTableName).Where(
-		sq.Eq{"id": id})
+func (q ResponsesQ) Delete() error {
+	var deleted []data.Response
 
-	result, err := q.db.ExecWithResult(query)
+	err := q.db.Select(&deleted, q.deleteBuilder.Suffix("RETURNING *"))
 	if err != nil {
 		return err
 	}
 
-	affectedRows, _ := result.RowsAffected()
-	if affectedRows == 0 {
-		return errors.New("no responses with such id")
+	if len(deleted) == 0 {
+		return errors.Errorf("no such data to delete")
 	}
 
 	return nil
 }
 
-func (q *ResponsesQ) FilterById(id string) data.Responses {
-	q.sql = q.sql.Where(sq.Eq{"id": id})
+func (q ResponsesQ) FilterByIds(ids ...string) data.Responses {
+	equalIds := sq.Eq{responsesIdColumn: ids}
 
-	return q
-}
-
-func (q *ResponsesQ) ResetFilters() data.Responses {
-	q.sql = selectedResponsesTable
+	q.selectBuilder = q.selectBuilder.Where(equalIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalIds)
 
 	return q
 }

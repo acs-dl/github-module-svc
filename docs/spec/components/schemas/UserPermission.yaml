@@ -14,8 +14,6 @@ allOf:
           - path
           - access_level
           - deployable
-          - expires_at
-          - level
         properties:
           username:
             type: string
@@ -29,10 +27,6 @@ allOf:
             type: int64
             description: user id from identity
             example: 666
-          level:
-            type: int64
-            description: link level in tree
-            example: 2
           type:
             type: string
             description: type of link for which was given access (group or project)

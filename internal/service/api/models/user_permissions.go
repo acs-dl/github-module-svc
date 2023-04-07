@@ -1,12 +1,19 @@
 package models
 
 import (
+	"strconv"
+	"time"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/resources"
-	"strconv"
 )
 
 func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPermission {
+	var expiresAt *time.Time = nil
+	if !permission.ExpiresAt.IsZero() {
+		expiresAt = &permission.ExpiresAt
+	}
+
 	return resources.UserPermission{
 		Key: resources.Key{
 			ID:   strconv.Itoa(counter),
@@ -17,7 +24,6 @@ func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPerm
 			ModuleId: permission.GithubId,
 			Path:     permission.Path,
 			UserId:   permission.UserId,
-			Level:    permission.Nlevel,
 			Type:     permission.Type,
 			Link:     permission.Link,
 			AccessLevel: resources.AccessLevel{
@@ -25,7 +31,7 @@ func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPerm
 				Value: permission.AccessLevel,
 			},
 			Deployable: permission.HasChild,
-			ExpiresAt:  permission.ExpiresAt,
+			ExpiresAt:  expiresAt,
 		},
 	}
 }
@@ -45,6 +51,7 @@ func NewUserPermissionListResponse(permissions []data.Sub) UserPermissionListRes
 }
 
 type UserPermissionListResponse struct {
+	Meta  Meta                       `json:"meta"`
 	Data  []resources.UserPermission `json:"data"`
 	Links *resources.Links           `json:"links"`
 }

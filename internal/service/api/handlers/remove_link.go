@@ -1,10 +1,11 @@
 package handlers
 
 import (
+	"net/http"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
-	"net/http"
 )
 
 func RemoveLink(w http.ResponseWriter, r *http.Request) {
@@ -15,7 +16,7 @@ func RemoveLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = LinksQ(r).Delete(request.Data.Attributes.Link)
+	err = LinksQ(r).FilterByLinks(request.Data.Attributes.Link).Delete()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to delete link")
 		ape.RenderErr(w, problems.InternalError())

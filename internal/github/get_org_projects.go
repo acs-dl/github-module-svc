@@ -3,10 +3,12 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 	"net/http"
 	"strconv"
+	"time"
+
+	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (g *github) GetProjectsFromApi(link string) ([]data.Sub, error) {
@@ -23,13 +25,24 @@ func (g *github) GetProjectsFromApi(link string) ([]data.Sub, error) {
 
 	for page := 1; ; page++ {
 		q := req.URL.Query()
-		q.Add("per_page", "100")
-		q.Add("page", strconv.Itoa(page))
+		q.Set("per_page", "100")
+		q.Set("page", strconv.Itoa(page))
 		req.URL.RawQuery = q.Encode()
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return nil, errors.Wrap(err, " error making http request")
+		}
+
+		if res.StatusCode == http.StatusForbidden {
+			timeoutDuration, err := g.getDuration(res)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get time duration from response")
+			}
+			g.log.Warnf("we need to wait `%d`", timeoutDuration)
+			time.Sleep(timeoutDuration)
+			page--
+			continue
 		}
 
 		if res.StatusCode != http.StatusOK {

@@ -9,7 +9,6 @@ const (
 	UserOwned         = "User"
 	OrganizationOwned = "Organization"
 	Push              = "push"
-	Project           = "project"
 	Group             = "group"
 )
 
@@ -33,7 +32,13 @@ type ModulePayload struct {
 	Type        string `json:"type"`
 }
 
+type UnverifiedPayload struct {
+	Action string           `json:"action"`
+	Users  []UnverifiedUser `json:"users"`
+}
+
 var Roles = map[string]string{
+	"":         "No access",
 	"read":     "Read",
 	"triage":   "Triage",
 	"write":    "Write",

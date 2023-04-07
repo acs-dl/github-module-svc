@@ -1,11 +1,14 @@
 package processor
 
 import (
-	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/logan/v3/errors"
 	"strconv"
 	"time"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (p *processor) validateAddUser(msg data.ModulePayload) error {
@@ -32,26 +35,41 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to parse user id")
 	}
 
-	permission, err := p.githubClient.AddUserFromApi(msg.Link, msg.Username, msg.AccessLevel)
+	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.AddUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.AccessLevel)}, pqueue.NormalPriority)
 	if err != nil {
-		return err
+		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to add function in pqueue")
 	}
+
+	err = item.Response.Error
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to add user from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "some error while adding user from api")
+	}
+	permission, ok := item.Response.Value.(*data.Permission)
+	if !ok {
+		return errors.Errorf("wrong response type")
+	}
+
 	if permission == nil {
-		p.log.Errorf("something wrong with adding user from api for message action with id `%s`", msg.RequestId)
-		return errors.Errorf("something wrong with adding user from api")
+		p.log.WithError(err).Errorf("something wrong with adding user for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "something wrong with adding user")
 	}
 
 	permission.UserId = &userId
 	permission.RequestId = msg.RequestId
+	permission.CreatedAt = time.Now()
+
+	dbUser := data.User{
+		Id:        &userId,
+		Username:  permission.Username,
+		GithubId:  permission.GithubId,
+		CreatedAt: permission.CreatedAt,
+		AvatarUrl: permission.AvatarUrl,
+	}
 
 	err = p.managerQ.Transaction(func() error {
-		if err = p.usersQ.Upsert(data.User{
-			Id:        &userId,
-			Username:  permission.Username,
-			GithubId:  permission.GithubId,
-			CreatedAt: time.Now(),
-			AvatarUrl: permission.AvatarUrl,
-		}); err != nil {
+		if err = p.usersQ.Upsert(dbUser); err != nil {
 			p.log.WithError(err).Errorf("failed to creat user in user db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to create user in user db")
 		}
@@ -62,7 +80,7 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		}
 
 		//in case if we have some rows without id from identity
-		if err = p.permissionsQ.UpdateUserId(*permission); err != nil {
+		if err = p.permissionsQ.FilterByGithubIds(permission.GithubId).Update(data.PermissionToUpdate{UserId: permission.UserId}); err != nil {
 			p.log.WithError(err).Errorf("failed to update user id in permission db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to update user id in user db")
 		}
@@ -74,6 +92,18 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to make add user transaction")
 	}
 
+	err = p.SendDeleteUser(msg.RequestId, dbUser)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to publish users for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to publish users")
+	}
+
+	p.resetFilters()
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
+}
+
+func (p *processor) resetFilters() {
+	p.usersQ = p.usersQ.New()
+	p.permissionsQ = p.permissionsQ.New()
 }
