@@ -21,6 +21,7 @@ func (c *config) Registrator() RegistratorConfig {
 
 		if err := figure.
 			Out(&cfg).
+			With(figure.BaseHooks).
 			From(kv.MustGetStringMap(c.getter, "registrator")).
 			Please(); err != nil {
 			panic(errors.Wrap(err, "failed to get core registrator config from config"))

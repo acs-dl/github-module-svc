@@ -17,7 +17,7 @@ func (g *github) GetUserFromApi(username string) (*data.User, error) {
 	}
 
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.token))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.usualToken))
 	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
 
 	res, err := http.DefaultClient.Do(req)

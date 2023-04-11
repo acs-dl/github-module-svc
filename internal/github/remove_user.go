@@ -21,7 +21,7 @@ func (g *github) RemoveUserFromApi(link, username, typeTo string) error {
 	}
 
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.token))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.superToken))
 	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
 
 	res, err := http.DefaultClient.Do(req)

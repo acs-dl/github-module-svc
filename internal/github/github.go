@@ -1,6 +1,7 @@
 package github
 
 import (
+	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3"
 )
@@ -41,13 +42,15 @@ type TypeSub struct {
 }
 
 type github struct {
-	token string
-	log   *logan.Entry
+	superToken string
+	usualToken string
+	log        *logan.Entry
 }
 
-func NewGithub(token string, log *logan.Entry) GithubClient {
+func NewGithub(cfg config.Config) GithubClient {
 	return &github{
-		token: token,
-		log:   log,
+		superToken: cfg.Github().SuperToken,
+		usualToken: cfg.Github().UsualToken,
+		log:        cfg.Log(),
 	}
 }

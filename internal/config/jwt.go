@@ -17,6 +17,7 @@ func (c *config) JwtParams() *JwtCfg {
 		var config JwtCfg
 		err := figure.
 			Out(&config).
+			With(figure.BaseHooks).
 			From(kv.MustGetStringMap(c.getter, "jwt")).
 			Please()
 		if err != nil {

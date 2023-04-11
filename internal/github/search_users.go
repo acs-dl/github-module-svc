@@ -17,7 +17,7 @@ func (g *github) SearchByFromApi(username string) ([]data.User, error) {
 	}
 
 	req.Header.Set("Accept", "application/vnd.Github+json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.token))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.usualToken))
 	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
 
 	q := req.URL.Query()

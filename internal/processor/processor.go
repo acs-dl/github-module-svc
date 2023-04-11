@@ -11,7 +11,6 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -59,13 +58,13 @@ var handleActions = map[string]func(proc *processor, msg data.ModulePayload) err
 func NewProcessor(cfg config.Config, ctx context.Context) Processor {
 	return &processor{
 		log:          cfg.Log().WithField("service", serviceName),
-		githubClient: github.NewGithub(cfg.Github().Token, cfg.Log().WithField("service", serviceName)),
+		githubClient: github.NewGithub(cfg),
 		permissionsQ: postgres.NewPermissionsQ(cfg.DB()),
 		subsQ:        postgres.NewSubsQ(cfg.DB()),
 		usersQ:       postgres.NewUsersQ(cfg.DB()),
 		managerQ:     manager.NewManager(cfg.DB()),
 		sender:       sender.NewSender(cfg),
-		pqueue:       handlers.PQueue(ctx),
+		pqueue:       pqueue.PQueue(ctx),
 	}
 }
 

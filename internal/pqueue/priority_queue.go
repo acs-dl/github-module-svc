@@ -1,11 +1,13 @@
 package pqueue
 
 import (
+	"context"
 	"errors"
 	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 )
 
 type PriorityQueueInterface interface {
@@ -110,4 +112,12 @@ func (pq *PriorityQueue) processNextItem() {
 		item.callFunction()
 		return
 	}
+}
+
+func PQueue(ctx context.Context) *PriorityQueue {
+	return ctx.Value(background.PqueueCtxKey).(*PriorityQueue)
+}
+
+func CtxPQueue(entry *PriorityQueue, ctx context.Context) context.Context {
+	return context.WithValue(ctx, background.PqueueCtxKey, entry)
 }

@@ -10,7 +10,8 @@ type Subs interface {
 	Select() ([]Sub, error)
 	Get() (*Sub, error)
 
-	FilterByParentLinks(parentIds ...string) Subs
+	FilterByParentLinks(parentLinks ...string) Subs
+	FilterByParentIds(parentIds ...int64) Subs
 	FilterByLinks(links ...string) Subs
 	FilterByIds(ids ...int64) Subs
 	SearchBy(search string) Subs

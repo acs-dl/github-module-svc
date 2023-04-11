@@ -9,7 +9,8 @@ import (
 )
 
 type apiRouter struct {
-	cfg config.Config
+	cfg           config.Config
+	parentContext context.Context
 }
 
 func (r *apiRouter) run() error {
@@ -22,12 +23,12 @@ func (r *apiRouter) run() error {
 	return http.Serve(r.cfg.Listener(), router)
 }
 
-func NewApiRouter(cfg config.Config) *apiRouter {
-	return &apiRouter{cfg: cfg}
+func NewApiRouter(ctx context.Context, cfg config.Config) *apiRouter {
+	return &apiRouter{cfg: cfg, parentContext: ctx}
 }
 
-func Run(_ context.Context, cfg config.Config) {
-	if err := NewApiRouter(cfg).run(); err != nil {
+func Run(ctx context.Context, cfg config.Config) {
+	if err := NewApiRouter(ctx, cfg).run(); err != nil {
 		panic(err)
 	}
 }
