@@ -36,7 +36,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 			ape.RenderErr(w, problems.BadRequest(err)...)
 			return
 		}
-		if permission != nil {
+		if permission == nil {
 			owned := data.OrganizationOwned
 			if permission.Type == data.Repository {
 				item, err := helpers.AddFunctionInPQueue(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
