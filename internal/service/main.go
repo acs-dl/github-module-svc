@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -74,7 +73,6 @@ func Run(cfg config.Config) {
 		}
 		logger.WithField("service", mySvc.Name).Info("Service started")
 	}
-	fmt.Println(ctx)
 
 	wg.Wait()
 }

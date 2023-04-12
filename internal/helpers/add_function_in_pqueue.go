@@ -19,6 +19,7 @@ func AddFunctionInPQueue(pq *pqueue.PriorityQueue, function any, functionArgs []
 		Priority: priority,
 	}
 	heap.Push(pq, queueItem)
+
 	item, err := pq.WaitUntilInvoked(queueItem.Id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait until invoked")
@@ -26,7 +27,7 @@ func AddFunctionInPQueue(pq *pqueue.PriorityQueue, function any, functionArgs []
 
 	err = pq.RemoveById(queueItem.Id)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to remove by uuid")
+		return nil, errors.Wrap(err, "failed to remove by id")
 	}
 
 	return item, nil

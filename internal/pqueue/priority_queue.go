@@ -53,14 +53,16 @@ func (pq *PriorityQueue) Swap(i, j int) {
 func (pq *PriorityQueue) Push(x interface{}) {
 	item := x.(*QueueItem)
 
-	_, exists := pq.queueMap[item.Id]
+	pqItem, exists := pq.queueMap[item.Id]
 	if exists {
+		pqItem.Amount++
 		return
 	}
 
 	n := len(pq.queueArray)
 	item.index = n
 	item.invoked = PROCESSING
+	item.Amount++
 	pq.queueArray = append(pq.queueArray, item)
 	pq.queueMap[item.Id] = item
 }
@@ -81,6 +83,11 @@ func (pq *PriorityQueue) RemoveById(id string) error {
 	item, err := pq.getElement(id)
 	if err != nil {
 		return err
+	}
+
+	if item.Amount > 1 {
+		item.Amount--
+		return nil
 	}
 
 	pq.queueArray = append(pq.queueArray[:item.index], pq.queueArray[item.index+1:]...)
