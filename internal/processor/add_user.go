@@ -35,7 +35,7 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to parse user id")
 	}
 
-	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.AddUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.AccessLevel)}, pqueue.NormalPriority)
+	item, err := helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.AddUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.AccessLevel)}, pqueue.NormalPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to add function in pqueue")

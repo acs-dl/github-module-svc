@@ -36,7 +36,7 @@ type worker struct {
 	usersQ        data.Users
 	subsQ         data.Subs
 	permissionsQ  data.Permissions
-	pqueue        *pqueue.PriorityQueue
+	pqueues       *pqueue.PQueues
 	runnerDelay   time.Duration
 	estimatedTime time.Duration
 }
@@ -50,7 +50,7 @@ func NewWorker(cfg config.Config, ctx context.Context) Worker {
 		subsQ:         postgres.NewSubsQ(cfg.DB()),
 		usersQ:        postgres.NewUsersQ(cfg.DB()),
 		permissionsQ:  postgres.NewPermissionsQ(cfg.DB()),
-		pqueue:        pqueue.PQueue(ctx),
+		pqueues:       pqueue.PQueuesInstance(ctx),
 		estimatedTime: time.Duration(0),
 		runnerDelay:   cfg.Runners().Worker,
 	}
@@ -189,7 +189,7 @@ func (w *worker) createPermission(link string) error {
 func (w *worker) CreateSubs(link string) error {
 	w.logger.Infof("creating subs for link `%s", link)
 
-	item, err := helpers.AddFunctionInPqueue(w.pqueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperPQueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
 	if err != nil {
 		w.logger.WithError(err).Errorf("failed to add function in pqueue")
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -245,7 +245,7 @@ func (w *worker) CreateSubs(link string) error {
 func (w *worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
 
-	item, err := helpers.AddFunctionInPqueue(w.pqueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperPQueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
 	if err != nil {
 		w.logger.WithError(err).Errorf("failed to add function in pqueue")
 		return errors.Wrap(err, "failed to add function in pqueue")

@@ -24,7 +24,7 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
+	item, err := helpers.AddFunctionInPQueue(p.pqueues.UsualPQueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -48,7 +48,7 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 	}
 
 	for _, permission := range permissions {
-		item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.CheckUserFromApi), []any{any(permission.Link), any(msg.Username), any(permission.Type)}, pqueue.NormalPriority)
+		item, err = helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.CheckUserFromApi), []any{any(permission.Link), any(msg.Username), any(permission.Type)}, pqueue.NormalPriority)
 		if err != nil {
 			p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to add function in pqueue")
@@ -65,7 +65,7 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 		}
 
 		if checkSub != nil {
-			item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.RemoveUserFromApi), []any{any(permission.Link), any(permission.Username), any(permission.Type)}, pqueue.NormalPriority)
+			item, err = helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.RemoveUserFromApi), []any{any(permission.Link), any(permission.Username), any(permission.Type)}, pqueue.NormalPriority)
 			if err != nil {
 				p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to add function in pqueue")
