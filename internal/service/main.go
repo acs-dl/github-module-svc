@@ -2,26 +2,38 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
+	"github.com/pkg/errors"
+	"gitlab.com/distributed_lab/acs/github-module/internal/github"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
+	"gitlab.com/distributed_lab/acs/github-module/internal/processor"
 	"gitlab.com/distributed_lab/acs/github-module/internal/receiver"
 	"gitlab.com/distributed_lab/acs/github-module/internal/registrator"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/api"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/types"
 )
 
-var availableServices = map[string]types.Runner{
-	"api":      api.Run,
-	"sender":   sender.Run,
-	"receiver": receiver.Run,
-	//"worker":    worker.Run,
-	"registrar": registrator.Run,
+type svc struct {
+	Name    string
+	New     func(config.Config, context.Context) interface{}
+	Run     func(interface{}, context.Context)
+	Context func(interface{}, context.Context) context.Context
+}
+
+var services = []svc{
+	{"github", github.NewGithubAsInterface, nil, github.CtxGithubClientInstance},
+	{"sender", sender.NewSenderAsInterface, sender.RunSenderAsInterface, sender.CtxSenderInstance},
+	{"processor", processor.NewProcessorAsInterface, nil, processor.CtxProcessorInstance},
+	{"receiver", receiver.NewReceiverAsInterface, receiver.RunReceiverAsInterface, receiver.CtxReceiverInstance},
+	{"worker", worker.NewWorkerAsInterface, worker.RunWorkerAsInterface, worker.CtxWorkerInstance},
+	{"registrar", registrator.NewRegistrarAsInterface, registrator.RunRegistrarAsInterface, nil},
+	{"api", api.NewRouterAsInterface, api.RunRouterAsInterface, nil},
 }
 
 func Run(cfg config.Config) {
@@ -36,33 +48,33 @@ func Run(cfg config.Config) {
 	go pqueues.SuperPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
 	go pqueues.UsualPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
 	ctx = pqueue.CtxPQueues(&pqueues, ctx)
-
 	ctx = background.CtxConfig(cfg, ctx)
 
-	//TODO: think about, how to save instances in context before running
-	wrkr := worker.NewWorker(cfg, ctx)
-	ctx = worker.CtxWorkerInstance(&wrkr, ctx)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		wrkr.Run(ctx)
-	}()
-	logger.WithField("service", "worker").Info("Service started")
-	//This is kostyl, remove it
-
-	for serviceName, service := range availableServices {
+	for _, mySvc := range services {
 		wg.Add(1)
 
-		go func(name string, runner types.Runner) {
-			defer wg.Done()
+		instance := mySvc.New(cfg, ctx)
+		if instance == nil {
+			logger.WithField("service", mySvc.Name).Warn("Service instance not created")
+			panic(errors.Errorf("`%s` instance not created", mySvc.Name))
+		}
 
-			runner(ctx, cfg)
+		if mySvc.Context != nil {
+			ctx = mySvc.Context(instance, ctx)
+		}
 
-		}(serviceName, service)
+		if mySvc.Run != nil {
+			wg.Add(1)
+			go func(structure interface{}, runner func(interface{}, context.Context)) {
+				defer wg.Done()
 
-		logger.WithField("service", serviceName).Info("Service started")
+				runner(structure, ctx)
+
+			}(instance, mySvc.Run)
+		}
+		logger.WithField("service", mySvc.Name).Info("Service started")
 	}
+	fmt.Println(ctx)
 
 	wg.Wait()
 }

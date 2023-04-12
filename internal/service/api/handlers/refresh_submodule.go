@@ -51,7 +51,7 @@ func RefreshSubmodule(w http.ResponseWriter, r *http.Request) {
 
 	estimatedTime := time.Duration(totalRequestsAmount) * timeToHandleOneRequest
 
-	workerInstance := worker.NewWorker(background.Config(parentContext), parentContext)
+	workerInstance := *worker.WorkerInstance(parentContext)
 	for _, link := range request.Data.Attributes.Links {
 		go func(linkToHandle string) {
 			err = workerInstance.CreateSubs(linkToHandle)

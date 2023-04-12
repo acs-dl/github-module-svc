@@ -145,6 +145,6 @@ func PQueuesInstance(ctx context.Context) *PQueues {
 	return ctx.Value(background.PqueueCtxKey).(*PQueues)
 }
 
-func CtxPQueues(entry *PQueues, ctx context.Context) context.Context {
+func CtxPQueues(entry interface{}, ctx context.Context) context.Context {
 	return context.WithValue(ctx, background.PqueueCtxKey, entry)
 }

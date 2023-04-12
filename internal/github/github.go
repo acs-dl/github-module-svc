@@ -1,8 +1,11 @@
 package github
 
 import (
+	"context"
+
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 	"gitlab.com/distributed_lab/logan/v3"
 )
 
@@ -47,10 +50,18 @@ type github struct {
 	log        *logan.Entry
 }
 
-func NewGithub(cfg config.Config) GithubClient {
-	return &github{
+func NewGithubAsInterface(cfg config.Config, _ context.Context) interface{} {
+	return interface{}(&github{
 		superToken: cfg.Github().SuperToken,
 		usualToken: cfg.Github().UsualToken,
 		log:        cfg.Log(),
-	}
+	})
+}
+
+func GithubClientInstance(ctx context.Context) GithubClient {
+	return ctx.Value(background.GithubClientCtxKey).(GithubClient)
+}
+
+func CtxGithubClientInstance(entry interface{}, ctx context.Context) context.Context {
+	return context.WithValue(ctx, background.GithubClientCtxKey, entry)
 }
