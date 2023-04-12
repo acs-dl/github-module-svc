@@ -12,7 +12,7 @@ amqp:
 
 github:
   super_token: "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" #access token for superuser for working with permissions
-  usual_token: "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" #access token for user for searching and getting users from api
+  usual_token: "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" #access token for user for searching and getting users from api
 
 runners:
   registrar: 10m
