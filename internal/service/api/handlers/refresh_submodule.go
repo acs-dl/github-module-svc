@@ -41,7 +41,8 @@ func RefreshSubmodule(w http.ResponseWriter, r *http.Request) {
 
 	parentContext := background.ParentContext(r.Context())
 
-	pqueueRequestsAmount := int64(pqueue.PQueue(parentContext).Len())
+	pqueueRequestsAmount := int64(pqueue.PQueuesInstance(parentContext).SuperPQueue.Len() + pqueue.PQueuesInstance(parentContext).UsualPQueue.Len())
+
 	requestsTimeLimit := background.Config(parentContext).RateLimit().TimeLimit
 	requestsAmountLimit := background.Config(parentContext).RateLimit().RequestsAmount
 

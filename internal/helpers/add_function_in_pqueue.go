@@ -1,31 +1,50 @@
 package helpers
 
 import (
-	"container/heap"
+	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
 
-	"github.com/google/uuid"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func AddFunctionInPqueue(pq *pqueue.PriorityQueue, function any, functionArgs []any, priority int) (*pqueue.QueueItem, error) {
-	newUuid := uuid.New()
+func AddFunctionInPQueue(pq *pqueue.PriorityQueue, function any, functionArgs []any, priority int) (*pqueue.QueueItem, error) {
 	queueItem := &pqueue.QueueItem{
-		Uuid:     newUuid,
+		Id:       GetFunctionSignature(function, functionArgs),
 		Func:     function,
 		Args:     functionArgs,
 		Priority: priority,
 	}
-	heap.Push(pq, queueItem)
-	item, err := pq.WaitUntilInvoked(newUuid)
+	item, err := pq.WaitUntilInvoked(queueItem.Id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wait until invoked")
 	}
 
-	err = pq.RemoveByUUID(newUuid)
+	err = pq.RemoveById(queueItem.Id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to remove by uuid")
 	}
 
 	return item, nil
+}
+
+func GetFunctionName(function interface{}) string {
+	splitName := strings.Split(runtime.FuncForPC(reflect.ValueOf(function).Pointer()).Name(), ".")
+	return splitName[len(splitName)-1]
+}
+
+func GetFunctionSignature(function interface{}, args []interface{}) string {
+	signatureParts := []string{GetFunctionName(function), "("}
+
+	signatureParts = append(signatureParts)
+
+	for _, arg := range args {
+		signatureParts = append(signatureParts, fmt.Sprintf("%v", arg))
+	}
+
+	signatureParts = append(signatureParts, ")")
+
+	return strings.Join(signatureParts, " ")
 }

@@ -32,9 +32,10 @@ func Run(cfg config.Config) {
 	logger.Info("Starting all available services...")
 
 	stopProcessQueue := make(chan struct{})
-	newPqueue := pqueue.NewPriorityQueue()
-	go newPqueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
-	ctx = pqueue.CtxPQueue(newPqueue.(*pqueue.PriorityQueue), ctx)
+	pqueues := pqueue.NewPQueues()
+	go pqueues.SuperPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
+	go pqueues.UsualPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
+	ctx = pqueue.CtxPQueues(&pqueues, ctx)
 
 	ctx = background.CtxConfig(cfg, ctx)
 

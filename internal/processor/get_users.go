@@ -26,7 +26,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.FindType), []any{any(msg.Link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.FindType), []any{any(msg.Link)}, pqueue.LowPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -53,7 +53,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "something wrong with link type")
 	}
 
-	item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.GetUsersFromApi), []any{any(msg.Link), any(msg.Type)}, pqueue.LowPriority)
+	item, err = helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.GetUsersFromApi), []any{any(msg.Link), any(msg.Type)}, pqueue.LowPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -74,7 +74,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 	for _, user := range users {
 		//api doesn't return role for organization members
 		if msg.Type == data.Organization {
-			item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.CheckOrgCollaborator), []any{any(msg.Link), any(user.Username)}, pqueue.LowPriority)
+			item, err = helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.CheckOrgCollaborator), []any{any(msg.Link), any(user.Username)}, pqueue.LowPriority)
 			if err != nil {
 				p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to add function in pqueue")

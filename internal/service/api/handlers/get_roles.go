@@ -39,7 +39,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		if permission != nil {
 			owned := data.OrganizationOwned
 			if permission.Type == data.Repository {
-				item, err := helpers.AddFunctionInPqueue(pqueue.PQueue(r.Context()), any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
+				item, err := helpers.AddFunctionInPQueue(pqueue.PQueuesInstance(r.Context()).SuperPQueue, any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
 				if err != nil {
 					background.Log(r).WithError(err).Errorf("failed to add function in pqueue")
 					ape.RenderErr(w, problems.InternalError())
@@ -66,7 +66,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	item, err := helpers.AddFunctionInPqueue(pqueue.PQueue(r.Context()), any(githubClient.FindType), []any{any(*request.Link)}, pqueue.HighPriority)
+	item, err := helpers.AddFunctionInPQueue(pqueue.PQueuesInstance(r.Context()).SuperPQueue, any(githubClient.FindType), []any{any(*request.Link)}, pqueue.HighPriority)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to add function in pqueue")
 		ape.RenderErr(w, problems.InternalError())
@@ -93,7 +93,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	owned := data.OrganizationOwned
 	if typeSub.Type == data.Repository {
-		item, err = helpers.AddFunctionInPqueue(pqueue.PQueue(r.Context()), any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
+		item, err = helpers.AddFunctionInPQueue(pqueue.PQueuesInstance(r.Context()).SuperPQueue, any(githubClient.FindRepoOwner), []any{any(*request.Link)}, pqueue.HighPriority)
 		if err != nil {
 			background.Log(r).WithError(err).Errorf("failed to add function in pqueue")
 			ape.RenderErr(w, problems.InternalError())
