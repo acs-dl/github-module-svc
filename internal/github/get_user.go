@@ -35,6 +35,10 @@ func (g *github) GetUserFromApi(username string) (*data.User, error) {
 		return g.GetUserFromApi(username)
 	}
 
+	if res.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, errors.New(fmt.Sprintf("error in response from API, status %s", res.Status))
 	}

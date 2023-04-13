@@ -92,8 +92,16 @@ func (pq *PriorityQueue) RemoveById(id string) error {
 
 	pq.queueArray = append(pq.queueArray[:item.index], pq.queueArray[item.index+1:]...)
 	delete(pq.queueMap, item.Id)
-
+	pq.FixIndexesInPQueue()
 	return nil
+}
+
+func (pq *PriorityQueue) FixIndexesInPQueue() {
+	for i, queueItem := range pq.queueArray {
+		if queueItem.index != i {
+			queueItem.index = i
+		}
+	}
 }
 
 func (pq *PriorityQueue) getElement(id string) (*QueueItem, error) {

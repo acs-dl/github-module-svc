@@ -27,7 +27,7 @@ func (g *github) FindType(link string) (*TypeSub, error) {
 		return &TypeSub{data.Organization, *org}, nil
 	}
 
-	return nil, errors.Errorf("failed to check type for `%s`", link)
+	return nil, nil
 }
 
 func (g *github) GetRepoFromApi(link string) (*data.Sub, error) {

@@ -40,8 +40,8 @@ func (r *Router) apiRouter() chi.Router {
 	router.Route("/integrations/github", func(r chi.Router) {
 		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
 			Get("/get_input", handlers.GetInputs)
-		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
-			Get("/get_available_roles", handlers.GetRoles)
+		//r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+		r.Get("/get_available_roles", handlers.GetRoles)
 
 		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
 			Route("/links", func(r chi.Router) {
