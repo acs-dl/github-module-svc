@@ -59,7 +59,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := getUser(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, githubClient, *request.Username)
+	user, err := getUser(pqueue.PQueuesInstance(background.ParentContext(r.Context())).UsualPQueue, githubClient, *request.Username)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to get user from api")
 		ape.RenderErr(w, problems.InternalError())
