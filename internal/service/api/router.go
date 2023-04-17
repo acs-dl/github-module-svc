@@ -57,8 +57,14 @@ func (r *Router) apiRouter() chi.Router {
 		r.Get("/user_roles", handlers.GetUserRolesMap) // comes from orchestrator
 
 		r.Route("/refresh", func(r chi.Router) {
-			r.Post("/submodule", handlers.RefreshSubmodule)
-			r.Post("/module", handlers.RefreshModule)
+			r.Route("/submodule", func(r chi.Router) {
+				r.Post("/", handlers.RefreshSubmodule)
+				r.Get("/", handlers.GetEstimatedRefreshSubmodule)
+			})
+			r.Route("/module", func(r chi.Router) {
+				r.Post("/", handlers.RefreshModule)
+				r.Get("/", handlers.GetEstimatedRefreshModule)
+			})
 		})
 
 		r.Route("/users", func(r chi.Router) {
