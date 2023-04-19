@@ -3,7 +3,6 @@ package handlers
 import (
 	"math"
 	"net/http"
-	"strings"
 	"time"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
@@ -17,14 +16,14 @@ import (
 )
 
 func GetEstimatedRefreshSubmodule(w http.ResponseWriter, r *http.Request) {
-	request, err := requests.NewGetEstimatedRefreshSubmoduleRequest(r)
+	request, err := requests.NewRefreshSubmoduleRequest(r)
 	if err != nil {
 		background.Log(r).WithError(err).Error("bad request")
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
 
-	subs, err := getSubs(strings.Split(*request.Submodules, " "), background.SubsQ(r))
+	subs, err := getSubs(request.Data.Attributes.Links, background.SubsQ(r))
 	if err != nil {
 		background.Log(r).WithError(err).Error("failed to get subs")
 		ape.RenderErr(w, problems.InternalError())
