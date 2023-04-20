@@ -65,7 +65,7 @@ func getPermissionsAmount(subs []data.Sub, subsQ data.Subs) (int64, error) {
 		amount += permissionsAmount
 	}
 
-	return -1, nil
+	return amount, nil
 }
 
 func getSubs(links []string, subsQ data.Subs) ([]data.Sub, error) {
