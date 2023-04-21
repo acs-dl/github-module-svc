@@ -68,6 +68,9 @@ func (r *Router) apiRouter() chi.Router {
 				r.Post("/module", handlers.GetEstimatedRefreshModule)
 			})
 
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Get("/submodule", handlers.CheckSubmodule)
+
 		r.Route("/users", func(r chi.Router) {
 			r.Get("/{id}", handlers.GetUserById) // comes from orchestrator
 
