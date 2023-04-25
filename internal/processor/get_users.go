@@ -145,7 +145,7 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 		return errors.Wrap(err, "failed to get parent permission")
 	}
 
-	if parentPermission == nil {
+	if parentPermission == nil || parentPermission.AccessLevel == "" {
 		//suppose that it means: that user is not in parent repo only in lower level
 		err = p.createHigherLevelPermissions(permission)
 		if err != nil {
