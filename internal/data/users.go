@@ -27,13 +27,14 @@ type Users interface {
 }
 
 type User struct {
-	Id        *int64    `db:"id" structs:"id,omitempty"`
-	Username  string    `json:"login" db:"username" structs:"username"`
-	GithubId  int64     `json:"id" db:"github_id" structs:"github_id"`
-	AvatarUrl string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
-	CreatedAt time.Time `json:"created_at" db:"created_at" structs:"-"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at" structs:"-"`
-	Submodule *string   `json:"-" db:"-" structs:"-"`
+	Id          *int64    `db:"id" structs:"id,omitempty"`
+	Username    string    `json:"login" db:"username" structs:"username"`
+	GithubId    int64     `json:"id" db:"github_id" structs:"github_id"`
+	AvatarUrl   string    `json:"avatar_url" db:"avatar_url" structs:"avatar_url"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at" structs:"-"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at" structs:"-"`
+	Submodule   *string   `json:"-" db:"-" structs:"-"`
+	AccessLevel *string   `json:"-" db:"-" structs:"-"`
 }
 
 type UnverifiedUser struct {
