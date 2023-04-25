@@ -6,7 +6,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"gitlab.com/distributed_lab/acs/github-module/internal/github"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -35,25 +35,47 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to parse user id")
 	}
 
-	item, err := helpers.AddFunctionInPQueue(p.pqueues.SuperPQueue, any(p.githubClient.AddUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.AccessLevel)}, pqueue.NormalPriority)
+	typeTo, err := p.getLinkType(msg.Link, pqueue.NormalPriority)
 	if err != nil {
-		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "failed to add function in pqueue")
+		p.log.WithError(err).Errorf("failed to get link type from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "some error while getting link type api")
 	}
 
-	err = item.Response.Error
+	checkPermission, err := github.GetPermissionWithCheck(
+		p.pqueues.SuperPQueue,
+		any(p.githubClient.CheckUserFromApi),
+		[]any{any(msg.Link), any(msg.Username), any(typeTo)},
+		pqueue.NormalPriority,
+	)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to check user from API for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "some error while checking link type api")
+	}
+
+	if checkPermission == nil {
+		p.log.Errorf("something wrong with user from API for message action with id `%s`", msg.RequestId)
+		return errors.New("something wrong with user from api")
+	}
+
+	if checkPermission.Ok {
+		p.log.Errorf("user is already in submodule from API for message action with id `%s`", msg.RequestId)
+		return errors.New("user is already in submodule")
+	}
+
+	permission, err := github.GetPermission(
+		p.pqueues.SuperPQueue,
+		any(p.githubClient.AddUserFromApi),
+		[]any{any(typeTo), any(msg.Link), any(msg.Username), any(msg.AccessLevel)},
+		pqueue.NormalPriority,
+	)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while adding user from api")
 	}
-	permission, ok := item.Response.Value.(*data.Permission)
-	if !ok {
-		return errors.Errorf("wrong response type")
-	}
 
 	if permission == nil {
-		p.log.WithError(err).Errorf("something wrong with adding user for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "something wrong with adding user")
+		p.log.Errorf("something wrong with adding user for message action with id `%s`", msg.RequestId)
+		return errors.New("something wrong with adding user")
 	}
 
 	permission.UserId = &userId
@@ -98,12 +120,6 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to publish users")
 	}
 
-	p.resetFilters()
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
-}
-
-func (p *processor) resetFilters() {
-	p.usersQ = p.usersQ.New()
-	p.permissionsQ = p.permissionsQ.New()
 }

@@ -149,7 +149,7 @@ func getLinkType(pq *pqueue.PriorityQueue, githubClient github.GithubClient, lin
 }
 
 func getRepositoryOwnerType(pq *pqueue.PriorityQueue, githubClient github.GithubClient, link string) (string, error) {
-	item, err := helpers.AddFunctionInPQueue(pq, any(githubClient.FindRepoOwner), []any{any(link)}, pqueue.HighPriority)
+	item, err := helpers.AddFunctionInPQueue(pq, any(githubClient.FindRepositoryOwner), []any{any(link)}, pqueue.HighPriority)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to add function in pqueue")
 	}

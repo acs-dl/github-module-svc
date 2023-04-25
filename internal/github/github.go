@@ -10,25 +10,25 @@ import (
 )
 
 type GithubClient interface {
-	AddUserFromApi(link, username, permission string) (*data.Permission, error)
-	UpdateUserFromApi(link, username, permission string) (*data.Permission, error)
-	AddOrUpdateUserInRepoFromApi(link, username, permission string) (*data.Permission, error)
-	AddOrUpdateUserInOrgFromApi(link, username, permission string) (*data.Permission, error)
+	AddUserFromApi(typeTo, link, username, permission string) (*data.Permission, error)
+	UpdateUserFromApi(typeTo, link, username, permission string) (*data.Permission, error)
+	AddOrUpdateUserInRepositoryFromApi(link, username, permission string) (*data.Permission, error)
+	AddOrUpdateUserInOrganizationFromApi(link, username, permission string) (*data.Permission, error)
 
 	GetUsersFromApi(link, typeTo string) ([]data.Permission, error)
 	GetUserFromApi(username string) (*data.User, error)
 
 	RemoveUserFromApi(link, username, typeTo string) error
 
-	GetOrgFromApi(link string) (*data.Sub, error)
-	GetRepoFromApi(link string) (*data.Sub, error)
+	GetOrganizationFromApi(link string) (*data.Sub, error)
+	GetRepositoryFromApi(link string) (*data.Sub, error)
 
 	CheckUserFromApi(link, username, typeTo string) (*CheckPermission, error)
-	CheckRepoCollaborator(link, username string) (*CheckPermission, error)
-	CheckOrgCollaborator(link, username string) (*CheckPermission, error)
+	CheckRepositoryCollaborator(link, username string) (*CheckPermission, error)
+	CheckOrganizationCollaborator(link, username string) (*CheckPermission, error)
 
 	FindType(link string) (*TypeSub, error)
-	FindRepoOwner(link string) (string, error)
+	FindRepositoryOwner(link string) (string, error)
 
 	SearchByFromApi(username string) ([]data.User, error)
 	GetProjectsFromApi(link string) ([]data.Sub, error)

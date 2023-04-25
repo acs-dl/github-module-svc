@@ -1,6 +1,10 @@
 package data
 
-import "time"
+import (
+	"io"
+	"net/http"
+	"time"
+)
 
 const (
 	ModuleName        = "github"
@@ -45,4 +49,19 @@ var Roles = map[string]string{
 	"maintain": "Maintain",
 	"admin":    "Admin",
 	"member":   "Member",
+}
+
+type RequestParams struct {
+	Method  string
+	Link    string
+	Body    []byte
+	Query   map[string]string
+	Header  map[string]string
+	Timeout time.Duration
+}
+
+type ResponseParams struct {
+	Body       io.ReadCloser
+	Header     http.Header
+	StatusCode int
 }
