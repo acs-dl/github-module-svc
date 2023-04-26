@@ -53,7 +53,7 @@ func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
 		return errors.Errorf("something wrong with user from api")
 	}
 
-	item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.UpdateUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.AccessLevel)}, pqueue.NormalPriority)
+	item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.UpdateUserFromApi), []any{any(msg.Link), any(msg.Username), any(msg.AccessLevel)}, pqueue.LowPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to add function in pqueue")
