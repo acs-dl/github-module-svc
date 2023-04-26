@@ -72,7 +72,7 @@ func (p *processor) createHigherLevelPermissions(permission data.Sub) error {
 			return errors.Wrap(err, "failed to upsert permission")
 		}
 
-		hasParent := true
+		hasParent := false
 		hasChild := true
 		err = p.permissionsQ.
 			FilterByGithubIds(newPermission.GithubId).
