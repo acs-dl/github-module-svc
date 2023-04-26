@@ -18,9 +18,9 @@ const (
 	linksCtxKey
 	subsCtxKey
 	PqueueCtxKey
-	configCtxKey
+	GithubClientCtxKey
 	parentContextCtxKey
-	WorkerCtxKey
+	configCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {

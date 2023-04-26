@@ -7,41 +7,40 @@ import (
 	"time"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (g *github) GetUserFromApi(username string) (*data.User, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/users/%s", username), nil)
+	params := data.RequestParams{
+		Method: http.MethodGet,
+		Link:   fmt.Sprintf("https://api.github.com/users/%s", username),
+		Body:   nil,
+		Query:  nil,
+		Header: map[string]string{
+			"Accept":               "application/vnd.Github+json",
+			"Authorization":        "Bearer " + g.superToken,
+			"X-GitHub-Api-Version": "2022-11-28",
+		},
+		Timeout: time.Second * 30,
+	}
+
+	res, err := helpers.MakeHttpRequest(params)
 	if err != nil {
-		return nil, errors.Wrap(err, " couldn't create request")
+		return nil, errors.Wrap(err, "failed to make http request")
 	}
 
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.usualToken))
-	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-
-	res, err := http.DefaultClient.Do(req)
+	res, err = helpers.HandleHttpResponseStatusCode(res, params)
 	if err != nil {
-		return nil, errors.Wrap(err, " error making http request")
+		return nil, errors.Wrap(err, "failed to check response status code")
 	}
-
-	if res.StatusCode == http.StatusForbidden {
-		timeoutDuration, err := g.getDuration(res)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get time duration from response")
-		}
-		g.log.Warnf("we need to wait `%d`", timeoutDuration)
-		time.Sleep(timeoutDuration)
-		return g.GetUserFromApi(username)
-	}
-
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, errors.New(fmt.Sprintf("error in response from API, status %s", res.Status))
+	if res == nil {
+		return nil, nil
 	}
 
 	var response data.Permission
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, errors.Wrap(err, " failed to unmarshal body")
+	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal body")
 	}
 
 	return &data.User{

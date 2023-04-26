@@ -12,7 +12,7 @@ import (
 	"gitlab.com/distributed_lab/ape"
 )
 
-func (r *apiRouter) apiRouter() chi.Router {
+func (r *Router) apiRouter() chi.Router {
 	router := chi.NewRouter()
 
 	logger := r.cfg.Log().WithField("service", fmt.Sprintf("%s-api", data.ModuleName))
@@ -56,10 +56,20 @@ func (r *apiRouter) apiRouter() chi.Router {
 		r.Get("/roles", handlers.GetRolesMap)          // comes from orchestrator
 		r.Get("/user_roles", handlers.GetUserRolesMap) // comes from orchestrator
 
-		r.Route("/refresh", func(r chi.Router) {
-			r.Post("/submodule", handlers.RefreshSubmodule)
-			r.Post("/module", handlers.RefreshModule)
-		})
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Route("/refresh", func(r chi.Router) {
+				r.Post("/submodule", handlers.RefreshSubmodule)
+				r.Post("/module", handlers.RefreshModule)
+			})
+
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Route("/estimate_refresh", func(r chi.Router) {
+				r.Post("/submodule", handlers.GetEstimatedRefreshSubmodule)
+				r.Post("/module", handlers.GetEstimatedRefreshModule)
+			})
+
+		r.With(auth.Jwt(secret, data.ModuleName, []string{data.Roles["read"], data.Roles["triage"], data.Roles["write"], data.Roles["maintain"], data.Roles["admin"], data.Roles["member"]}...)).
+			Get("/submodule", handlers.CheckSubmodule)
 
 		r.Route("/users", func(r chi.Router) {
 			r.Get("/{id}", handlers.GetUserById) // comes from orchestrator

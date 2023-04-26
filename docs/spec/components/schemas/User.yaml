@@ -30,3 +30,7 @@ allOf:
             type: string
             description: submodule name
             example: "test_acs"
+          access_level:
+            type: string
+            description: submodule access level
+            example: "push"

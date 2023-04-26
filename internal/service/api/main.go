@@ -8,12 +8,12 @@ import (
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-type apiRouter struct {
+type Router struct {
 	cfg           config.Config
 	parentContext context.Context
 }
 
-func (r *apiRouter) run() error {
+func (r *Router) Run(_ context.Context) error {
 	router := r.apiRouter()
 
 	if err := r.cfg.Copus().RegisterChi(router); err != nil {
@@ -23,12 +23,16 @@ func (r *apiRouter) run() error {
 	return http.Serve(r.cfg.Listener(), router)
 }
 
-func NewApiRouter(ctx context.Context, cfg config.Config) *apiRouter {
-	return &apiRouter{cfg: cfg, parentContext: ctx}
+func NewRouterAsInterface(cfg config.Config, ctx context.Context) interface{} {
+	return interface{}(&Router{
+		cfg:           cfg,
+		parentContext: ctx,
+	})
 }
 
-func Run(ctx context.Context, cfg config.Config) {
-	if err := NewApiRouter(ctx, cfg).run(); err != nil {
+func RunRouterAsInterface(structure interface{}, ctx context.Context) {
+	err := (structure.(*Router)).Run(ctx)
+	if err != nil {
 		panic(err)
 	}
 }
