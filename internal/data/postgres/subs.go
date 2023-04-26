@@ -190,6 +190,18 @@ func (q SubsQ) FilterByIds(ids ...int64) data.Subs {
 	return q
 }
 
+func (q SubsQ) FilterByParentIds(parentIds ...int64) data.Subs {
+	equalParentIds := sq.Eq{subsParentIdColumn: parentIds}
+	if len(parentIds) == 0 {
+		equalParentIds = sq.Eq{subsParentIdColumn: nil}
+	}
+
+	q.selectBuilder = q.selectBuilder.Where(equalParentIds)
+	q.deleteBuilder = q.deleteBuilder.Where(equalParentIds)
+
+	return q
+}
+
 func (q SubsQ) OrderBy(columns ...string) data.Subs {
 	q.selectBuilder = q.selectBuilder.OrderBy(columns...)
 

@@ -65,6 +65,9 @@ func (q PermissionsQ) New() data.Permissions {
 }
 
 func (q PermissionsQ) Update(permission data.PermissionToUpdate) error {
+	updatedAt := time.Now()
+	permission.UpdatedAt = &updatedAt
+
 	q.updateBuilder = q.updateBuilder.SetMap(structs.Map(permission))
 
 	return q.db.Exec(q.updateBuilder)

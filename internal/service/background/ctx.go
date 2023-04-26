@@ -1,12 +1,10 @@
-package handlers
+package background
 
 import (
 	"context"
 	"net/http"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/config"
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
-
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3"
 )
@@ -18,9 +16,11 @@ const (
 	permissionsCtxKey
 	usersCtxKey
 	linksCtxKey
-	paramsCtxKey
 	subsCtxKey
-	pqueueCtxKey
+	PqueueCtxKey
+	GithubClientCtxKey
+	parentContextCtxKey
+	configCtxKey
 )
 
 func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
@@ -31,16 +31,6 @@ func CtxLog(entry *logan.Entry) func(context.Context) context.Context {
 
 func Log(r *http.Request) *logan.Entry {
 	return r.Context().Value(logCtxKey).(*logan.Entry)
-}
-
-func CtxParams(entry *config.GithubCfg) func(context.Context) context.Context {
-	return func(ctx context.Context) context.Context {
-		return context.WithValue(ctx, paramsCtxKey, entry)
-	}
-}
-
-func Params(r *http.Request) *config.GithubCfg {
-	return r.Context().Value(paramsCtxKey).(*config.GithubCfg)
 }
 
 func PermissionsQ(r *http.Request) data.Permissions {
@@ -83,10 +73,20 @@ func CtxSubsQ(entry data.Subs) func(context.Context) context.Context {
 	}
 }
 
-func PQueue(ctx context.Context) *pqueue.PriorityQueue {
-	return ctx.Value(pqueueCtxKey).(*pqueue.PriorityQueue)
+func Config(ctx context.Context) config.Config {
+	return ctx.Value(configCtxKey).(config.Config)
 }
 
-func CtxPQueue(entry *pqueue.PriorityQueue, ctx context.Context) context.Context {
-	return context.WithValue(ctx, pqueueCtxKey, entry)
+func CtxConfig(entry config.Config, ctx context.Context) context.Context {
+	return context.WithValue(ctx, configCtxKey, entry)
+}
+
+func ParentContext(ctx context.Context) context.Context {
+	return ctx.Value(parentContextCtxKey).(context.Context)
+}
+
+func CtxParentContext(entry context.Context) func(context.Context) context.Context {
+	return func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, parentContextCtxKey, entry)
+	}
 }

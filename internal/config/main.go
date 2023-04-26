@@ -21,9 +21,9 @@ type Config interface {
 	Github() *GithubCfg
 	Amqp() *AmqpData
 	JwtParams() *JwtCfg
-
-	// Registrator config for Core
 	Registrator() RegistratorConfig
+	Runners() *RunnersCfg
+	RateLimit() *RateLimitCfg
 }
 
 type config struct {
@@ -41,6 +41,8 @@ type config struct {
 	amqp        comfig.Once
 	registrator comfig.Once
 	jwtCfg      comfig.Once
+	runners     comfig.Once
+	rateLimit   comfig.Once
 }
 
 func New(getter kv.Getter) Config {

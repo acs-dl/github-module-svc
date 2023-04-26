@@ -11,13 +11,12 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 const (
-	serviceName = data.ModuleName + "-processor"
+	ServiceName = data.ModuleName + "-processor"
 
 	//add needed actions for module
 	GetUsersAction   = "get_users"
@@ -44,7 +43,7 @@ type processor struct {
 	usersQ       data.Users
 	managerQ     *manager.Manager
 	sender       *sender.Sender
-	pqueue       *pqueue.PriorityQueue
+	pqueues      *pqueue.PQueues
 }
 
 var handleActions = map[string]func(proc *processor, msg data.ModulePayload) error{
@@ -56,17 +55,17 @@ var handleActions = map[string]func(proc *processor, msg data.ModulePayload) err
 	DeleteUserAction: (*processor).handleDeleteUserAction,
 }
 
-func NewProcessor(cfg config.Config, ctx context.Context) Processor {
-	return &processor{
-		log:          cfg.Log().WithField("service", serviceName),
-		githubClient: github.NewGithub(cfg.Github().Token, cfg.Log().WithField("service", serviceName)),
+func NewProcessorAsInterface(cfg config.Config, ctx context.Context) interface{} {
+	return interface{}(&processor{
+		log:          cfg.Log().WithField("service", ServiceName),
+		githubClient: github.GithubClientInstance(ctx),
+		sender:       sender.SenderInstance(ctx),
+		pqueues:      pqueue.PQueuesInstance(ctx),
+		managerQ:     manager.NewManager(cfg.DB()),
 		permissionsQ: postgres.NewPermissionsQ(cfg.DB()),
 		subsQ:        postgres.NewSubsQ(cfg.DB()),
 		usersQ:       postgres.NewUsersQ(cfg.DB()),
-		managerQ:     manager.NewManager(cfg.DB()),
-		sender:       sender.NewSender(cfg),
-		pqueue:       handlers.PQueue(ctx),
-	}
+	})
 }
 
 func (p *processor) HandleNewMessage(msg data.ModulePayload) error {
@@ -88,4 +87,12 @@ func (p *processor) HandleNewMessage(msg data.ModulePayload) error {
 
 	p.log.Infof("finish handling message with id `%s`", msg.RequestId)
 	return nil
+}
+
+func ProcessorInstance(ctx context.Context) Processor {
+	return ctx.Value(ServiceName).(Processor)
+}
+
+func CtxProcessorInstance(entry interface{}, ctx context.Context) context.Context {
+	return context.WithValue(ctx, ServiceName, entry)
 }

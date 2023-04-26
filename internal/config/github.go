@@ -7,20 +7,23 @@ import (
 )
 
 type GithubCfg struct {
-	Token string `figure:"token"`
+	SuperToken string `figure:"super_token"`
+	UsualToken string `figure:"usual_token"`
 }
 
 func (c *config) Github() *GithubCfg {
 	return c.github.Do(func() interface{} {
-		var config GithubCfg
+		var cfg GithubCfg
 		err := figure.
-			Out(&config).
+			Out(&cfg).
+			With(figure.BaseHooks).
 			From(kv.MustGetStringMap(c.getter, "github")).
 			Please()
+
 		if err != nil {
 			panic(errors.Wrap(err, "failed to figure out github params from config"))
 		}
 
-		return &config
+		return &cfg
 	}).(*GithubCfg)
 }

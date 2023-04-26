@@ -39,10 +39,11 @@ type Permission struct {
 }
 
 type PermissionToUpdate struct {
-	Username    *string `structs:"username,omitempty"`
-	AccessLevel *string `structs:"access_level,omitempty"`
-	UserId      *int64  `structs:"user_id,omitempty"`
-	ParentLink  *string `structs:"parent_link,omitempty"`
-	HasParent   *bool   `structs:"has_parent,omitempty"`
-	HasChild    *bool   `structs:"has_child,omitempty"`
+	Username    *string    `structs:"username,omitempty"`
+	AccessLevel *string    `structs:"access_level,omitempty"`
+	UserId      *int64     `structs:"user_id,omitempty"`
+	ParentLink  *string    `structs:"parent_link,omitempty"`
+	HasParent   *bool      `structs:"has_parent,omitempty"`
+	HasChild    *bool      `structs:"has_child,omitempty"`
+	UpdatedAt   *time.Time `structs:"updated_at,omitempty"`
 }
