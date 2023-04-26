@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
@@ -39,7 +40,9 @@ func GetUserById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if permission != nil {
+		accessLevel := fmt.Sprintf("%v", permission.AccessLevel)
 		user.Submodule = &permission.Link
+		user.AccessLevel = &accessLevel
 	}
 
 	ape.Render(w, models.NewUserResponse(*user))

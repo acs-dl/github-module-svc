@@ -1,44 +1,25 @@
 package processor
 
 import (
-	"container/heap"
-
-	"github.com/google/uuid"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
+	"gitlab.com/distributed_lab/acs/github-module/internal/github"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
-func (p *processor) addFunctionInPqueue(function any, functionArgs []any, priority int) (*pqueue.QueueItem, error) {
-	newUuid := uuid.New()
-	queueItem := &pqueue.QueueItem{
-		Uuid:     newUuid,
-		Func:     function,
-		Args:     functionArgs,
-		Priority: priority,
-	}
-	heap.Push(p.pqueue, queueItem)
-	item, err := p.pqueue.WaitUntilInvoked(newUuid)
+func (p *processor) getLinkType(link string, priority int) (string, error) {
+	checkType, err := github.GetPermissionWithType(p.pqueues.SuperPQueue, any(p.githubClient.FindType), []any{any(link)}, priority)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to wait until invoked")
+		return "", errors.Wrap(err, "failed to get link type")
 	}
 
-	err = p.pqueue.RemoveByUUID(newUuid)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to remove by uuid")
+	if checkType == nil {
+		return "", errors.New("no type was found ")
 	}
 
-	return item, nil
-}
-
-func (p *processor) convertUserFromInterfaceAndCheck(userInterface any) (*data.User, error) {
-	user, ok := userInterface.(*data.User)
-	if !ok {
-		return nil, errors.Errorf("wrong response type while getting users from api")
-	}
-	if user == nil {
-		return nil, errors.Errorf("something wrong with user from api")
+	if validation.Validate(checkType.Type, validation.In(data.Organization, data.Repository)) != nil {
+		return "", errors.Wrap(err, "something wrong with link type")
 	}
 
-	return user, nil
+	return checkType.Type, nil
 }

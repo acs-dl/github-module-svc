@@ -4,7 +4,6 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
-	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -24,19 +23,13 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	item, err := helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
-	if err != nil {
-		p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "failed to add function in pqueue")
-	}
-
-	err = item.Response.Error
+	userApi, err := github.GetUser(p.pqueues.UsualPQueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting user from api")
 	}
-	userApi, err := p.convertUserFromInterfaceAndCheck(item.Response.Value)
-	if err != nil {
+
+	if userApi == nil {
 		p.log.WithError(err).Errorf("something wrong with user for message action with id `%s`", msg.RequestId)
 		return errors.Errorf("something wrong with user from api")
 	}
@@ -48,30 +41,23 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 	}
 
 	for _, permission := range permissions {
-		item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.CheckUserFromApi), []any{any(permission.Link), any(msg.Username), any(permission.Type)}, pqueue.NormalPriority)
-		if err != nil {
-			p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
-			return errors.Wrap(err, "failed to add function in pqueue")
-		}
-
-		err = item.Response.Error
+		checkSub, err := github.GetPermissionWithCheck(
+			p.pqueues.SuperPQueue,
+			any(p.githubClient.CheckUserFromApi),
+			[]any{any(permission.Link), any(msg.Username), any(permission.Type)},
+			pqueue.NormalPriority,
+		)
 		if err != nil {
 			p.log.WithError(err).Errorf("failed to check user from API for message action with id `%s`", msg.RequestId)
-			return errors.Wrap(err, "some error while checking user from api")
-		}
-		checkSub, ok := item.Response.Value.(*github.CheckPermission)
-		if !ok {
-			return errors.Errorf("wrong response type")
+			return errors.Wrap(err, "some error while checking link type api")
 		}
 
 		if checkSub != nil {
-			item, err = helpers.AddFunctionInPqueue(p.pqueue, any(p.githubClient.RemoveUserFromApi), []any{any(permission.Link), any(permission.Username), any(permission.Type)}, pqueue.NormalPriority)
-			if err != nil {
-				p.log.WithError(err).Errorf("failed to add function in pqueue for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "failed to add function in pqueue")
-			}
-
-			err = item.Response.Error
+			err = github.GetRequestError(
+				p.pqueues.SuperPQueue,
+				any(p.githubClient.RemoveUserFromApi),
+				[]any{any(permission.Link), any(permission.Username), any(permission.Type)},
+				pqueue.NormalPriority)
 			if err != nil {
 				p.log.WithError(err).Errorf("failed to remove user from API for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "some error while removing user from api")
@@ -111,7 +97,6 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 		}
 	}
 
-	p.resetFilters()
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
 }

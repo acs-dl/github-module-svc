@@ -11,9 +11,8 @@ import (
 	"gitlab.com/distributed_lab/ape"
 )
 
-func RefreshModule(w http.ResponseWriter, r *http.Request) {
+func GetEstimatedRefreshModule(w http.ResponseWriter, r *http.Request) {
 	parentContext := background.ParentContext(r.Context())
-
 	workerInstance := *worker.WorkerInstance(parentContext)
 
 	pqueueRequestsAmount := int64(pqueue.PQueuesInstance(parentContext).SuperPQueue.Len() + pqueue.PQueuesInstance(parentContext).UsualPQueue.Len())
@@ -23,13 +22,5 @@ func RefreshModule(w http.ResponseWriter, r *http.Request) {
 	timeToHandleOneRequest := requestsTimeLimit / time.Duration(requestsAmountLimit)
 	estimatedTime := time.Duration(pqueueRequestsAmount)*timeToHandleOneRequest + workerInstance.GetEstimatedTime()
 
-	go func() {
-		err := workerInstance.ProcessPermissions(parentContext)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	w.WriteHeader(http.StatusAccepted)
 	ape.Render(w, models.NewEstimatedTimeResponse(estimatedTime.String()))
 }

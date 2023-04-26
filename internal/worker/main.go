@@ -13,13 +13,12 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/processor"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 	"gitlab.com/distributed_lab/logan/v3"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 	"gitlab.com/distributed_lab/running"
 )
 
-const serviceName = data.ModuleName + "-worker"
+const ServiceName = data.ModuleName + "-worker"
 
 type Worker interface {
 	Run(ctx context.Context)
@@ -36,31 +35,31 @@ type worker struct {
 	usersQ        data.Users
 	subsQ         data.Subs
 	permissionsQ  data.Permissions
-	pqueue        *pqueue.PriorityQueue
+	pqueues       *pqueue.PQueues
 	runnerDelay   time.Duration
 	estimatedTime time.Duration
 }
 
-func NewWorker(cfg config.Config, ctx context.Context) Worker {
-	return &worker{
-		logger:        cfg.Log().WithField("runner", serviceName),
-		processor:     processor.NewProcessor(cfg, ctx),
-		githubClient:  github.NewGithub(cfg),
+func NewWorkerAsInterface(cfg config.Config, ctx context.Context) interface{} {
+	return interface{}(&worker{
+		logger:        cfg.Log().WithField("runner", ServiceName),
+		processor:     processor.ProcessorInstance(ctx),
+		githubClient:  github.GithubClientInstance(ctx),
+		pqueues:       pqueue.PQueuesInstance(ctx),
 		linksQ:        postgres.NewLinksQ(cfg.DB()),
 		subsQ:         postgres.NewSubsQ(cfg.DB()),
 		usersQ:        postgres.NewUsersQ(cfg.DB()),
 		permissionsQ:  postgres.NewPermissionsQ(cfg.DB()),
-		pqueue:        pqueue.PQueue(ctx),
 		estimatedTime: time.Duration(0),
 		runnerDelay:   cfg.Runners().Worker,
-	}
+	})
 }
 
 func (w *worker) Run(ctx context.Context) {
 	running.WithBackOff(
 		ctx,
 		w.logger,
-		serviceName,
+		ServiceName,
 		w.ProcessPermissions,
 		w.runnerDelay,
 		w.runnerDelay,
@@ -189,7 +188,7 @@ func (w *worker) createPermission(link string) error {
 func (w *worker) CreateSubs(link string) error {
 	w.logger.Infof("creating subs for link `%s", link)
 
-	item, err := helpers.AddFunctionInPqueue(w.pqueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperPQueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
 	if err != nil {
 		w.logger.WithError(err).Errorf("failed to add function in pqueue")
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -245,7 +244,7 @@ func (w *worker) CreateSubs(link string) error {
 func (w *worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
 
-	item, err := helpers.AddFunctionInPqueue(w.pqueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperPQueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
 	if err != nil {
 		w.logger.WithError(err).Errorf("failed to add function in pqueue")
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -287,12 +286,4 @@ func (w *worker) processNested(link string, parentId int64) error {
 
 func (w *worker) GetEstimatedTime() time.Duration {
 	return w.estimatedTime
-}
-
-func WorkerInstance(ctx context.Context) *Worker {
-	return ctx.Value(background.WorkerCtxKey).(*Worker)
-}
-
-func CtxWorkerInstance(entry *Worker, ctx context.Context) context.Context {
-	return context.WithValue(ctx, background.WorkerCtxKey, entry)
 }

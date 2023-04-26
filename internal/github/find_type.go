@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (g *github) FindType(link string) (*TypeSub, error) {
-	repo, err := g.GetRepoFromApi(link)
+	repo, err := g.GetRepositoryFromApi(link)
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +20,7 @@ func (g *github) FindType(link string) (*TypeSub, error) {
 		return &TypeSub{data.Repository, *repo}, err
 	}
 
-	org, err := g.GetOrgFromApi(link)
+	org, err := g.GetOrganizationFromApi(link)
 	if err != nil {
 		return nil, err
 	}
@@ -27,96 +28,84 @@ func (g *github) FindType(link string) (*TypeSub, error) {
 		return &TypeSub{data.Organization, *org}, nil
 	}
 
-	return nil, errors.Errorf("failed to check type for `%s`", link)
+	return nil, nil
 }
 
-func (g *github) GetRepoFromApi(link string) (*data.Sub, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/repos/%s", link), nil)
+func (g *github) GetRepositoryFromApi(link string) (*data.Sub, error) {
+	params := data.RequestParams{
+		Method: http.MethodGet,
+		Link:   fmt.Sprintf("https://api.github.com/repos/%s", link),
+		Body:   nil,
+		Query:  nil,
+		Header: map[string]string{
+			"Accept":               "application/vnd.Github+json",
+			"Authorization":        "Bearer " + g.superToken,
+			"X-GitHub-Api-Version": "2022-11-28",
+		},
+		Timeout: time.Second * 30,
+	}
+
+	res, err := helpers.MakeHttpRequest(params)
 	if err != nil {
-		return nil, errors.Wrap(err, " couldn't create request")
+		return nil, errors.Wrap(err, "failed to make http request")
 	}
 
-	req.Header.Set("Accept", "application/vnd.Github+json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.superToken))
-	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-
-	res, err := http.DefaultClient.Do(req)
+	res, err = helpers.HandleHttpResponseStatusCode(res, params)
 	if err != nil {
-		return nil, errors.Wrap(err, " error making http request")
+		return nil, errors.Wrap(err, "failed to check response status code")
 	}
-
-	if res.StatusCode == http.StatusForbidden {
-		timeoutDuration, err := g.getDuration(res)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get time duration from response")
-		}
-		g.log.Warnf("we need to wait `%d`", timeoutDuration)
-		time.Sleep(timeoutDuration)
-		return g.GetRepoFromApi(link)
-	}
-
-	if res.StatusCode == http.StatusNotFound {
+	if res == nil {
 		return nil, nil
 	}
 
-	if res.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("failed to get group status `%s`", res.Status)
+	var response data.Sub
+	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal body")
 	}
+	response.Type = data.Repository
 
-	var returned data.Sub
-	if err := json.NewDecoder(res.Body).Decode(&returned); err != nil {
-		return nil, errors.Wrap(err, " failed to unmarshal body")
-	}
-	returned.Type = data.Repository
-
-	return &returned, nil
+	return &response, nil
 }
 
-func (g *github) GetOrgFromApi(link string) (*data.Sub, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/orgs/%s", link), nil)
+func (g *github) GetOrganizationFromApi(link string) (*data.Sub, error) {
+	params := data.RequestParams{
+		Method: http.MethodGet,
+		Link:   fmt.Sprintf("https://api.github.com/orgs/%s", link),
+		Body:   nil,
+		Query:  nil,
+		Header: map[string]string{
+			"Accept":               "application/vnd.Github+json",
+			"Authorization":        "Bearer " + g.superToken,
+			"X-GitHub-Api-Version": "2022-11-28",
+		},
+		Timeout: time.Second * 30,
+	}
+
+	res, err := helpers.MakeHttpRequest(params)
 	if err != nil {
-		return nil, errors.Wrap(err, " couldn't create request")
+		return nil, errors.Wrap(err, "failed to make http request")
 	}
 
-	req.Header.Set("Accept", "application/vnd.Github+json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", g.superToken))
-	req.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-
-	res, err := http.DefaultClient.Do(req)
+	res, err = helpers.HandleHttpResponseStatusCode(res, params)
 	if err != nil {
-		return nil, errors.Wrap(err, " error making http request")
+		return nil, errors.Wrap(err, "failed to check response status code")
 	}
-
-	if res.StatusCode == http.StatusForbidden {
-		timeoutDuration, err := g.getDuration(res)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get time duration from response")
-		}
-		g.log.Warnf("we need to wait `%d`", timeoutDuration)
-		time.Sleep(timeoutDuration)
-		return g.GetOrgFromApi(link)
-	}
-
-	if res.StatusCode == http.StatusNotFound {
+	if res == nil {
 		return nil, nil
 	}
 
-	if res.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("failed to get group status `%s`", res.Status)
-	}
-
-	returned := struct {
+	response := struct {
 		Id    int64  `json:"id"`
 		Login string `json:"login"`
 	}{}
-	if err := json.NewDecoder(res.Body).Decode(&returned); err != nil {
-		return nil, errors.Wrap(err, " failed to unmarshal body")
+	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal body")
 	}
 
 	return &data.Sub{
-		Id:   returned.Id,
-		Link: returned.Login,
-		Path: returned.Login,
+		Id:   response.Id,
+		Link: response.Login,
+		Path: response.Login,
 		Type: data.Organization,
 	}, nil
 }

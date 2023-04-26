@@ -15,7 +15,7 @@ import (
 	"gitlab.com/distributed_lab/running"
 )
 
-const serviceName = data.ModuleName + "-sender"
+const ServiceName = data.ModuleName + "-sender"
 
 type Sender struct {
 	publisher   *amqp.Publisher
@@ -25,19 +25,19 @@ type Sender struct {
 	runnerDelay time.Duration
 }
 
-func NewSender(cfg config.Config) *Sender {
-	return &Sender{
+func NewSenderAsInterface(cfg config.Config, _ context.Context) interface{} {
+	return interface{}(&Sender{
 		publisher:   cfg.Amqp().Publisher,
 		responsesQ:  postgres.NewResponsesQ(cfg.DB()),
-		log:         logan.New().WithField("service", serviceName),
+		log:         logan.New().WithField("service", ServiceName),
 		topic:       "orchestrator",
 		runnerDelay: cfg.Runners().Sender,
-	}
+	})
 }
 
 func (s *Sender) Run(ctx context.Context) {
 	go running.WithBackOff(ctx, s.log,
-		serviceName,
+		ServiceName,
 		s.processMessages,
 		s.runnerDelay,
 		s.runnerDelay,
@@ -45,7 +45,7 @@ func (s *Sender) Run(ctx context.Context) {
 	)
 }
 
-func (s *Sender) processMessages(ctx context.Context) error {
+func (s *Sender) processMessages(_ context.Context) error {
 	s.log.Info("started processing responses")
 
 	responses, err := s.responsesQ.Select()
