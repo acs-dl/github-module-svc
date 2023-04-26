@@ -53,14 +53,16 @@ func (pq *PriorityQueue) Swap(i, j int) {
 func (pq *PriorityQueue) Push(x interface{}) {
 	item := x.(*QueueItem)
 
-	_, exists := pq.queueMap[item.Id]
+	pqItem, exists := pq.queueMap[item.Id]
 	if exists {
+		pqItem.Amount++
 		return
 	}
 
 	n := len(pq.queueArray)
 	item.index = n
 	item.invoked = PROCESSING
+	item.Amount++
 	pq.queueArray = append(pq.queueArray, item)
 	pq.queueMap[item.Id] = item
 }
@@ -83,10 +85,23 @@ func (pq *PriorityQueue) RemoveById(id string) error {
 		return err
 	}
 
+	if item.Amount > 1 {
+		item.Amount--
+		return nil
+	}
+
 	pq.queueArray = append(pq.queueArray[:item.index], pq.queueArray[item.index+1:]...)
 	delete(pq.queueMap, item.Id)
-
+	pq.FixIndexesInPQueue()
 	return nil
+}
+
+func (pq *PriorityQueue) FixIndexesInPQueue() {
+	for i, queueItem := range pq.queueArray {
+		if queueItem.index != i {
+			queueItem.index = i
+		}
+	}
 }
 
 func (pq *PriorityQueue) getElement(id string) (*QueueItem, error) {
@@ -145,6 +160,6 @@ func PQueuesInstance(ctx context.Context) *PQueues {
 	return ctx.Value(background.PqueueCtxKey).(*PQueues)
 }
 
-func CtxPQueues(entry *PQueues, ctx context.Context) context.Context {
+func CtxPQueues(entry interface{}, ctx context.Context) context.Context {
 	return context.WithValue(ctx, background.PqueueCtxKey, entry)
 }

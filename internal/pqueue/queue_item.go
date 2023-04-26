@@ -28,6 +28,7 @@ type QueueItem struct {
 	Response Response
 
 	Priority int
+	Amount   int
 	index    int
 	invoked  ItemStatus
 
