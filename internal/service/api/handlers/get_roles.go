@@ -47,7 +47,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 	if permission != nil {
 		owned := data.OrganizationOwned
 		if permission.Type == data.Repository {
-			owned, err = getRepositoryOwnerType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, githubClient, *request.Link)
+			owned, err = getRepositoryOwnerType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
 			if err != nil {
 				background.Log(r).WithError(err).Errorf("failed to get repository owner type")
 				ape.RenderErr(w, problems.InternalError())
@@ -59,7 +59,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := getUser(pqueue.PQueuesInstance(background.ParentContext(r.Context())).UsualPQueue, githubClient, *request.Username)
+	user, err := getUser(pqueue.PQueuesInstance(background.ParentContext(r.Context())).UserPQueue, githubClient, *request.Username)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to get user from api")
 		ape.RenderErr(w, problems.InternalError())
@@ -72,7 +72,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	typeSub, err := getLinkType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, githubClient, *request.Link)
+	typeSub, err := getLinkType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to get link type")
 		ape.RenderErr(w, problems.InternalError())
@@ -87,7 +87,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	owned := data.OrganizationOwned
 	if typeSub.Type == data.Repository {
-		owned, err = getRepositoryOwnerType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, githubClient, *request.Link)
+		owned, err = getRepositoryOwnerType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
 		if err != nil {
 			background.Log(r).WithError(err).Errorf("failed to get repository owner type")
 			ape.RenderErr(w, problems.InternalError())
@@ -95,7 +95,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	permission, err = getPermission(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, githubClient, *request.Link, *request.Username, typeSub.Type)
+	permission, err = getPermission(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link, *request.Username, typeSub.Type)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to get permission for repository")
 		ape.RenderErr(w, problems.InternalError())
@@ -180,14 +180,14 @@ func getPermission(pq *pqueue.PriorityQueue, githubClient github.GithubClient, l
 	}
 	var ok bool
 
-	owned, ok := item.Response.Value.(*github.CheckPermission)
+	permission, ok := item.Response.Value.(*data.Permission)
 	if !ok {
 		return nil, errors.Errorf("wrong response type")
 	}
 
-	if owned == nil {
+	if permission == nil {
 		return nil, nil
 	}
 
-	return &owned.Permission, nil
+	return permission, nil
 }

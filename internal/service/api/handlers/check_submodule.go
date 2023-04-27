@@ -40,7 +40,7 @@ func CheckSubmodule(w http.ResponseWriter, r *http.Request) {
 
 	githubClient := github.GithubClientInstance(background.ParentContext(r.Context()))
 
-	typeSub, err := getLinkType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperPQueue, githubClient, *request.Link)
+	typeSub, err := getLinkType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to get type from api")
 		ape.RenderErr(w, problems.InternalError())

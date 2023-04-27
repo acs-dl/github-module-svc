@@ -38,9 +38,9 @@ func (g *github) GetRepositoryFromApi(link string) (*data.Sub, error) {
 		Body:   nil,
 		Query:  nil,
 		Header: map[string]string{
-			"Accept":               "application/vnd.Github+json",
-			"Authorization":        "Bearer " + g.superToken,
-			"X-GitHub-Api-Version": "2022-11-28",
+			"Accept":               data.AcceptHeader,
+			"Authorization":        "Bearer " + g.superUserToken,
+			"X-GitHub-Api-Version": data.GithubApiVersionHeader,
 		},
 		Timeout: time.Second * 30,
 	}
@@ -74,9 +74,9 @@ func (g *github) GetOrganizationFromApi(link string) (*data.Sub, error) {
 		Body:   nil,
 		Query:  nil,
 		Header: map[string]string{
-			"Accept":               "application/vnd.Github+json",
-			"Authorization":        "Bearer " + g.superToken,
-			"X-GitHub-Api-Version": "2022-11-28",
+			"Accept":               data.AcceptHeader,
+			"Authorization":        "Bearer " + g.superUserToken,
+			"X-GitHub-Api-Version": data.GithubApiVersionHeader,
 		},
 		Timeout: time.Second * 30,
 	}
@@ -94,18 +94,5 @@ func (g *github) GetOrganizationFromApi(link string) (*data.Sub, error) {
 		return nil, nil
 	}
 
-	response := struct {
-		Id    int64  `json:"id"`
-		Login string `json:"login"`
-	}{}
-	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal body")
-	}
-
-	return &data.Sub{
-		Id:   response.Id,
-		Link: response.Login,
-		Path: response.Login,
-		Type: data.Organization,
-	}, nil
+	return populateGetOrganizationResponse(res)
 }

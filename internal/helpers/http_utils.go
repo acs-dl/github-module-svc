@@ -3,6 +3,7 @@ package helpers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -71,6 +72,11 @@ func HandleHttpResponseStatusCode(response *data.ResponseParams, params data.Req
 }
 
 func HandleTooManyRequests(header http.Header, params data.RequestParams) (*data.ResponseParams, error) {
+	//If you exceed the rate limit, the response will have a 403 status and the x-ratelimit-remaining header will be 0
+	if header.Get("x-ratelimit-remaining ") != "0" {
+		return nil, errors.New("request is forbidden")
+	}
+
 	timeoutDuration, err := GetDuration(header)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get time duration from response")
@@ -106,4 +112,38 @@ func GetDuration(header http.Header) (time.Duration, error) {
 	}
 
 	return 0, errors.New("failed to retrieve time from headers")
+}
+
+func MakeRequestWithPagination(params data.RequestParams) ([]byte, error) {
+	result := make([]interface{}, 0)
+
+	for page := 1; ; page++ {
+		params.Query["page"] = strconv.Itoa(page)
+
+		res, err := MakeHttpRequest(params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to make http request")
+		}
+
+		res, err = HandleHttpResponseStatusCode(res, params)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to check response status code")
+		}
+		if res == nil {
+			return nil, errors.Errorf("error in response, status %v", res.StatusCode)
+		}
+
+		var response []interface{}
+		if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal body")
+		}
+
+		if len(response) == 0 {
+			break
+		}
+
+		result = append(result, response...)
+	}
+
+	return json.Marshal(result)
 }

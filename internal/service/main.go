@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -39,13 +40,13 @@ func Run(cfg config.Config) {
 	logger := cfg.Log().WithField("service", "main")
 	ctx := context.Background()
 	wg := new(sync.WaitGroup)
-
+	fmt.Println(cfg.Github())
 	logger.Info("Starting all available services...")
 
 	stopProcessQueue := make(chan struct{})
 	pqueues := pqueue.NewPQueues()
-	go pqueues.SuperPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
-	go pqueues.UsualPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
+	go pqueues.SuperUserPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
+	go pqueues.UserPQueue.ProcessQueue(cfg.RateLimit().RequestsAmount, cfg.RateLimit().TimeLimit, stopProcessQueue)
 	ctx = pqueue.CtxPQueues(&pqueues, ctx)
 	ctx = background.CtxConfig(cfg, ctx)
 

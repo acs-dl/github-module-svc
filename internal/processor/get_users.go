@@ -31,7 +31,7 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "some error while getting link type api")
 	}
 
-	permissions, err := github.GetPermissions(p.pqueues.SuperPQueue, any(p.githubClient.GetUsersFromApi), []any{any(msg.Link), any(msg.Type)}, pqueue.LowPriority)
+	permissions, err := github.GetPermissions(p.pqueues.SuperUserPQueue, any(p.githubClient.GetUsersFromApi), []any{any(msg.Link), any(msg.Type)}, pqueue.LowPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get users from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting users from api")
@@ -42,8 +42,8 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 	for _, permission := range permissions {
 		//api doesn't return role for organization members
 		if msg.Type == data.Organization {
-			checkPermission, err := github.GetPermissionWithCheck(
-				p.pqueues.SuperPQueue,
+			checkPermission, err := github.GetPermission(
+				p.pqueues.SuperUserPQueue,
 				any(p.githubClient.CheckOrganizationCollaborator), []any{any(msg.Link), any(permission.Username)},
 				pqueue.LowPriority)
 			if err != nil {
@@ -51,11 +51,11 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				return errors.Wrap(err, "failed to get permission from api")
 			}
 			if checkPermission == nil {
-				p.log.Errorf("something went wrong with getting permission for message action with id `%s`", msg.RequestId)
-				return errors.Errorf("something went wrong with getting permission from api")
+				p.log.Errorf("user is not in organization for message action with id `%s`", msg.RequestId)
+				return errors.Errorf("user is not in organization")
 			}
 
-			permission.AccessLevel = checkPermission.Permission.AccessLevel
+			permission.AccessLevel = checkPermission.AccessLevel
 		}
 
 		err = p.managerQ.Transaction(func() error {

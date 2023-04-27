@@ -188,7 +188,7 @@ func (w *worker) createPermission(link string) error {
 func (w *worker) CreateSubs(link string) error {
 	w.logger.Infof("creating subs for link `%s", link)
 
-	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperPQueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperUserPQueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
 	if err != nil {
 		w.logger.WithError(err).Errorf("failed to add function in pqueue")
 		return errors.Wrap(err, "failed to add function in pqueue")
@@ -244,7 +244,7 @@ func (w *worker) CreateSubs(link string) error {
 func (w *worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
 
-	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperPQueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
+	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperUserPQueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
 	if err != nil {
 		w.logger.WithError(err).Errorf("failed to add function in pqueue")
 		return errors.Wrap(err, "failed to add function in pqueue")

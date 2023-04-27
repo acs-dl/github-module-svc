@@ -15,14 +15,14 @@ type PriorityQueueInterface interface {
 }
 
 type PQueues struct {
-	SuperPQueue *PriorityQueue
-	UsualPQueue *PriorityQueue
+	SuperUserPQueue *PriorityQueue
+	UserPQueue      *PriorityQueue
 }
 
 func NewPQueues() PQueues {
 	return PQueues{
-		SuperPQueue: NewPriorityQueue().(*PriorityQueue),
-		UsualPQueue: NewPriorityQueue().(*PriorityQueue),
+		SuperUserPQueue: NewPriorityQueue().(*PriorityQueue),
+		UserPQueue:      NewPriorityQueue().(*PriorityQueue),
 	}
 }
 
@@ -41,13 +41,13 @@ func NewPriorityQueue() PriorityQueueInterface {
 func (pq *PriorityQueue) Len() int { return len(pq.queueArray) }
 
 func (pq *PriorityQueue) Less(i, j int) bool {
-	return (*pq).queueArray[i].Priority > (*pq).queueArray[j].Priority
+	return pq.queueArray[i].Priority > pq.queueArray[j].Priority
 }
 
 func (pq *PriorityQueue) Swap(i, j int) {
-	(*pq).queueArray[i], (*pq).queueArray[j] = (*pq).queueArray[j], (*pq).queueArray[i]
-	(*pq).queueArray[i].index = i
-	(*pq).queueArray[j].index = j
+	pq.queueArray[i], pq.queueArray[j] = pq.queueArray[j], pq.queueArray[i]
+	pq.queueArray[i].index = i
+	pq.queueArray[j].index = j
 }
 
 func (pq *PriorityQueue) Push(x interface{}) {

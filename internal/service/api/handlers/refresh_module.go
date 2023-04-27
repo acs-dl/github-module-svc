@@ -16,7 +16,7 @@ func RefreshModule(w http.ResponseWriter, r *http.Request) {
 
 	workerInstance := *worker.WorkerInstance(parentContext)
 
-	pqueueRequestsAmount := int64(pqueue.PQueuesInstance(parentContext).SuperPQueue.Len() + pqueue.PQueuesInstance(parentContext).UsualPQueue.Len())
+	pqueueRequestsAmount := int64(pqueue.PQueuesInstance(parentContext).SuperUserPQueue.Len() + pqueue.PQueuesInstance(parentContext).UserPQueue.Len())
 	requestsTimeLimit := background.Config(parentContext).RateLimit().TimeLimit
 	requestsAmountLimit := background.Config(parentContext).RateLimit().RequestsAmount
 

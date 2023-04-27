@@ -23,9 +23,9 @@ type GithubClient interface {
 	GetOrganizationFromApi(link string) (*data.Sub, error)
 	GetRepositoryFromApi(link string) (*data.Sub, error)
 
-	CheckUserFromApi(link, username, typeTo string) (*CheckPermission, error)
-	CheckRepositoryCollaborator(link, username string) (*CheckPermission, error)
-	CheckOrganizationCollaborator(link, username string) (*CheckPermission, error)
+	CheckUserFromApi(link, username, typeTo string) (*data.Permission, error)
+	CheckRepositoryCollaborator(link, username string) (*data.Permission, error)
+	CheckOrganizationCollaborator(link, username string) (*data.Permission, error)
 
 	FindType(link string) (*TypeSub, error)
 	FindRepositoryOwner(link string) (string, error)
@@ -34,27 +34,22 @@ type GithubClient interface {
 	GetProjectsFromApi(link string) ([]data.Sub, error)
 }
 
-type CheckPermission struct {
-	Ok         bool
-	Permission data.Permission
-}
-
 type TypeSub struct {
 	Type string
 	Sub  data.Sub
 }
 
 type github struct {
-	superToken string
-	usualToken string
-	log        *logan.Entry
+	superUserToken string
+	userToken      string
+	log            *logan.Entry
 }
 
 func NewGithubAsInterface(cfg config.Config, _ context.Context) interface{} {
 	return interface{}(&github{
-		superToken: cfg.Github().SuperToken,
-		usualToken: cfg.Github().UsualToken,
-		log:        cfg.Log(),
+		superUserToken: cfg.Github().SuperToken,
+		userToken:      cfg.Github().UsualToken,
+		log:            cfg.Log(),
 	})
 }
 

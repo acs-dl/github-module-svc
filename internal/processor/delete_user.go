@@ -23,7 +23,7 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
-	userApi, err := github.GetUser(p.pqueues.UsualPQueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
+	userApi, err := github.GetUser(p.pqueues.UserPQueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting user from api")
@@ -41,62 +41,69 @@ func (p *processor) handleDeleteUserAction(msg data.ModulePayload) error {
 	}
 
 	for _, permission := range permissions {
-		checkSub, err := github.GetPermissionWithCheck(
-			p.pqueues.SuperPQueue,
-			any(p.githubClient.CheckUserFromApi),
-			[]any{any(permission.Link), any(msg.Username), any(permission.Type)},
-			pqueue.NormalPriority,
-		)
+		err = p.removePermissionFromRemoteAndLocal(permission)
 		if err != nil {
-			p.log.WithError(err).Errorf("failed to check user from API for message action with id `%s`", msg.RequestId)
-			return errors.Wrap(err, "some error while checking link type api")
-		}
-
-		if checkSub != nil {
-			err = github.GetRequestError(
-				p.pqueues.SuperPQueue,
-				any(p.githubClient.RemoveUserFromApi),
-				[]any{any(permission.Link), any(permission.Username), any(permission.Type)},
-				pqueue.NormalPriority)
-			if err != nil {
-				p.log.WithError(err).Errorf("failed to remove user from API for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "some error while removing user from api")
-			}
-		}
-
-		err = p.permissionsQ.FilterByGithubIds(userApi.GithubId).FilterByLinks(permission.Link).FilterByTypes(permission.Type).Delete()
-		if err != nil {
-			p.log.WithError(err).Errorf("failed to delete permission from db for message action with id `%s`", msg.RequestId)
-			return errors.Wrap(err, "failed to delete permission")
+			p.log.WithError(err).Errorf("failed to remove permission from remote and local for message action with id `%s`", msg.RequestId)
+			return errors.Wrap(err, "failed to remove permission from remote and local")
 		}
 	}
 
-	var dbUser *data.User
-	dbUser, err = p.usersQ.FilterByGithubIds(userApi.GithubId).Get()
+	err = p.removeUserFromService(msg.RequestId, userApi.GithubId)
 	if err != nil {
-		p.log.WithError(err).Errorf("failed to get user by github id `%d` for message action with id `%s`", userApi.GithubId, msg.RequestId)
+		p.log.WithError(err).Errorf("failed to remove user from service for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to remove user from service ")
+	}
+
+	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
+	return nil
+}
+
+func (p *processor) removePermissionFromRemoteAndLocal(permission data.Permission) error {
+	isHere, err := p.isUserInSubmodule(permission.Link, permission.Username, permission.Type)
+	if err != nil {
+		return errors.Wrap(err, "some error while checking user from api")
+	}
+
+	if isHere {
+		err = github.GetRequestError(
+			p.pqueues.SuperUserPQueue,
+			any(p.githubClient.RemoveUserFromApi),
+			[]any{any(permission.Link), any(permission.Username), any(permission.Type)},
+			pqueue.NormalPriority)
+		if err != nil {
+			return errors.Wrap(err, "some error while removing user from api")
+		}
+	}
+
+	err = p.permissionsQ.FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).FilterByTypes(permission.Type).Delete()
+	if err != nil {
+		return errors.Wrap(err, "failed to delete permission")
+	}
+
+	return nil
+}
+
+func (p *processor) removeUserFromService(requestId string, githubId int64) error {
+	dbUser, err := p.usersQ.FilterByGithubIds(githubId).Get()
+	if err != nil {
 		return errors.Wrap(err, "failed to get user")
 	}
 
 	if dbUser == nil {
-		p.log.WithError(err).Errorf("something wrong with db user for message action with id `%s`", userApi.GithubId, msg.RequestId)
 		return errors.Wrap(err, "something wrong with db user")
 	}
 
-	err = p.usersQ.FilterByGithubIds(userApi.GithubId).Delete()
+	err = p.usersQ.FilterByGithubIds(githubId).Delete()
 	if err != nil {
-		p.log.WithError(err).Errorf("failed to delete user by github id `%d` for message action with id `%s`", userApi.GithubId, msg.RequestId)
 		return errors.Wrap(err, "failed to delete user")
 	}
 
 	if dbUser.Id == nil {
-		err = p.SendDeleteUser(msg.RequestId, *dbUser)
+		err = p.SendDeleteUser(requestId, *dbUser)
 		if err != nil {
-			p.log.WithError(err).Errorf("failed to publish delete user for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to publish delete user")
 		}
 	}
 
-	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
 }
