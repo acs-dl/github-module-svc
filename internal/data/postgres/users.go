@@ -44,6 +44,8 @@ func (q UsersQ) Upsert(user data.User) error {
 	clauses := structs.Map(user)
 
 	updateQuery := sq.Update(" ").
+		Set("username", user.Username).
+		Set("avatar_url", user.AvatarUrl).
 		Set("updated_at", time.Now())
 
 	if user.Id != nil {
