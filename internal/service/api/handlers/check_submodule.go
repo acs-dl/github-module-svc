@@ -3,8 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/github"
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
@@ -35,20 +33,6 @@ func CheckSubmodule(w http.ResponseWriter, r *http.Request) {
 
 	if sub != nil {
 		ape.Render(w, models.NewLinkResponse(sub.Path, true))
-		return
-	}
-
-	githubClient := github.GithubClientInstance(background.ParentContext(r.Context()))
-
-	typeSub, err := getLinkType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
-	if err != nil {
-		background.Log(r).WithError(err).Errorf("failed to get type from api")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-
-	if typeSub != nil {
-		ape.Render(w, models.NewLinkResponse(typeSub.Sub.Path, true))
 		return
 	}
 
