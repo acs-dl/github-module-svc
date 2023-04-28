@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,7 +18,7 @@ func Run(args []string) bool {
 	log := logan.New()
 
 	cfg := config.New(kv.MustFromEnv())
-	fmt.Println(kv.MustFromEnv().GetStringMap("github"))
+
 	log = cfg.Log()
 
 	defer func() {

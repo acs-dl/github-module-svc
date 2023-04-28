@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -40,7 +39,7 @@ func Run(cfg config.Config) {
 	logger := cfg.Log().WithField("service", "main")
 	ctx := context.Background()
 	wg := new(sync.WaitGroup)
-	fmt.Println(cfg.Github())
+
 	logger.Info("Starting all available services...")
 
 	stopProcessQueue := make(chan struct{})
