@@ -16,7 +16,7 @@ func (p *processor) validateUpdateUser(msg data.ModulePayload) error {
 	}.Filter()
 }
 
-func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
+func (p *processor) HandleUpdateUserAction(msg data.ModulePayload) error {
 	p.log.Infof("start handle message action with id `%s`", msg.RequestId)
 
 	err := p.validateUpdateUser(msg)

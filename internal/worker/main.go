@@ -20,14 +20,14 @@ import (
 
 const ServiceName = data.ModuleName + "-worker"
 
-type Worker interface {
+type IWorker interface {
 	Run(ctx context.Context)
 	ProcessPermissions(ctx context.Context) error
-	CreateSubs(link string) error
+	RefreshSubmodules(msg data.ModulePayload) error
 	GetEstimatedTime() time.Duration
 }
 
-type worker struct {
+type Worker struct {
 	logger        *logan.Entry
 	processor     processor.Processor
 	githubClient  github.GithubClient
@@ -41,7 +41,7 @@ type worker struct {
 }
 
 func NewWorkerAsInterface(cfg config.Config, ctx context.Context) interface{} {
-	return interface{}(&worker{
+	return interface{}(&Worker{
 		logger:        cfg.Log().WithField("runner", ServiceName),
 		processor:     processor.ProcessorInstance(ctx),
 		githubClient:  github.GithubClientInstance(ctx),
@@ -55,7 +55,7 @@ func NewWorkerAsInterface(cfg config.Config, ctx context.Context) interface{} {
 	})
 }
 
-func (w *worker) Run(ctx context.Context) {
+func (w *Worker) Run(ctx context.Context) {
 	running.WithBackOff(
 		ctx,
 		w.logger,
@@ -67,7 +67,7 @@ func (w *worker) Run(ctx context.Context) {
 	)
 }
 
-func (w *worker) ProcessPermissions(_ context.Context) error {
+func (w *Worker) ProcessPermissions(_ context.Context) error {
 	w.logger.Info("fetching links")
 
 	startTime := time.Now()
@@ -88,7 +88,7 @@ func (w *worker) ProcessPermissions(_ context.Context) error {
 	for _, link := range links {
 		w.logger.Infof("processing link `%s`", link.Link)
 
-		err = w.CreateSubs(link.Link)
+		err = w.createSubs(link.Link)
 		if err != nil {
 			w.logger.Infof("failed to create subs for link `%s", link.Link)
 			return errors.Wrap(err, "failed to create subs")
@@ -114,7 +114,24 @@ func (w *worker) ProcessPermissions(_ context.Context) error {
 	return nil
 }
 
-func (w *worker) removeOldUsers(borderTime time.Time) error {
+func (w *Worker) RefreshSubmodules(msg data.ModulePayload) error {
+	w.logger.Infof("started refresh submodules")
+
+	for _, link := range msg.Links {
+		w.logger.Infof("started refreshing `%s`", link)
+		err := w.createSubs(link)
+		if err != nil {
+			w.logger.Infof("failed to create subs for link `%s", link)
+			return errors.Wrap(err, "failed to create subs")
+		}
+		w.logger.Infof("finished refreshing `%s`", link)
+	}
+
+	w.logger.Infof("finished refresh submodules")
+	return nil
+}
+
+func (w *Worker) removeOldUsers(borderTime time.Time) error {
 	w.logger.Infof("started removing old users")
 
 	users, err := w.usersQ.FilterByLowerTime(borderTime).Select()
@@ -145,7 +162,7 @@ func (w *worker) removeOldUsers(borderTime time.Time) error {
 	return nil
 }
 
-func (w *worker) removeOldPermissions(borderTime time.Time) error {
+func (w *Worker) removeOldPermissions(borderTime time.Time) error {
 	w.logger.Infof("started removing old permissions")
 
 	permissions, err := w.permissionsQ.FilterByLowerTime(borderTime).Select()
@@ -168,12 +185,11 @@ func (w *worker) removeOldPermissions(borderTime time.Time) error {
 	return nil
 }
 
-func (w *worker) createPermission(link string) error {
+func (w *Worker) createPermission(link string) error {
 	w.logger.Infof("processing sub `%s`", link)
 
-	if err := w.processor.HandleNewMessage(data.ModulePayload{
+	if err := w.processor.HandleGetUsersAction(data.ModulePayload{
 		RequestId: "from-worker",
-		Action:    processor.GetUsersAction,
 		Link:      link,
 	}); err != nil {
 		w.logger.Infof("failed to get users sub `%s`", link)
@@ -185,7 +201,7 @@ func (w *worker) createPermission(link string) error {
 	return nil
 }
 
-func (w *worker) CreateSubs(link string) error {
+func (w *Worker) createSubs(link string) error {
 	w.logger.Infof("creating subs for link `%s", link)
 
 	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperUserPQueue, any(w.githubClient.FindType), []any{any(link)}, pqueue.LowPriority)
@@ -241,7 +257,7 @@ func (w *worker) CreateSubs(link string) error {
 	return nil
 }
 
-func (w *worker) processNested(link string, parentId int64) error {
+func (w *Worker) processNested(link string, parentId int64) error {
 	w.logger.Debugf("processing link `%s`", link)
 
 	item, err := helpers.AddFunctionInPQueue(w.pqueues.SuperUserPQueue, any(w.githubClient.GetProjectsFromApi), []any{any(link)}, pqueue.LowPriority)
@@ -284,6 +300,6 @@ func (w *worker) processNested(link string, parentId int64) error {
 	return nil
 }
 
-func (w *worker) GetEstimatedTime() time.Duration {
+func (w *Worker) GetEstimatedTime() time.Duration {
 	return w.estimatedTime
 }

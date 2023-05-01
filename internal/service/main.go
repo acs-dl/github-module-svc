@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/processor"
@@ -14,8 +15,6 @@ import (
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
-
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
 )
 
 type svc struct {
@@ -29,8 +28,8 @@ var services = []svc{
 	{"github", github.NewGithubAsInterface, nil, github.CtxGithubClientInstance},
 	{"sender", sender.NewSenderAsInterface, sender.RunSenderAsInterface, sender.CtxSenderInstance},
 	{"processor", processor.NewProcessorAsInterface, nil, processor.CtxProcessorInstance},
-	{"receiver", receiver.NewReceiverAsInterface, receiver.RunReceiverAsInterface, receiver.CtxReceiverInstance},
 	{"worker", worker.NewWorkerAsInterface, worker.RunWorkerAsInterface, worker.CtxWorkerInstance},
+	{"receiver", receiver.NewReceiverAsInterface, receiver.RunReceiverAsInterface, receiver.CtxReceiverInstance},
 	{"registrar", registrator.NewRegistrarAsInterface, registrator.RunRegistrarAsInterface, nil},
 	{"api", api.NewRouterAsInterface, api.RunRouterAsInterface, nil},
 }

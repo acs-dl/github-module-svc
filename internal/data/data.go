@@ -28,13 +28,14 @@ type ModuleRequest struct {
 }
 
 type ModulePayload struct {
-	RequestId   string `json:"request_id"`
-	UserId      string `json:"user_id"`
-	Action      string `json:"action"`
-	Link        string `json:"link"`
-	Username    string `json:"username"`
-	AccessLevel string `json:"access_level"`
-	Type        string `json:"type"`
+	RequestId   string   `json:"request_id"`
+	UserId      string   `json:"user_id"`
+	Action      string   `json:"action"`
+	Link        string   `json:"link"`
+	Links       []string `json:"links"`
+	Username    string   `json:"username"`
+	AccessLevel string   `json:"access_level"`
+	Type        string   `json:"type"`
 }
 
 type UnverifiedPayload struct {
