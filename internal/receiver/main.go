@@ -21,7 +21,6 @@ import (
 const (
 	ServiceName = data.ModuleName + "-receiver"
 
-	GetUsersAction   = "get_users"
 	AddUserAction    = "add_user"
 	UpdateUserAction = "update_user"
 	RemoveUserAction = "remove_user"
