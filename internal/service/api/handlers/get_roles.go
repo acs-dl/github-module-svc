@@ -25,13 +25,13 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	if request.Link == nil {
 		background.Log(r).Infof("no link was provided")
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
 
 	if request.Username == nil {
 		background.Log(r).Infof("no username was provided")
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
 
@@ -68,7 +68,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	if user == nil {
 		background.Log(r).Infof("no user with `%s` username in github", *request.Username)
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
 
@@ -81,7 +81,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	if typeSub == nil {
 		background.Log(r).Infof("nothing found with `%s` link in github", *request.Link)
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
 
@@ -103,7 +103,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if permission == nil {
-		ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
 	ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, permission.AccessLevel))

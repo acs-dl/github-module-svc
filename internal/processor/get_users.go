@@ -160,6 +160,13 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 	}
 
 	if permission.AccessLevel == parentPermission.AccessLevel {
+		hasParent := true
+		err = p.permissionsQ.FilterByGithubIds(permission.GithubId).
+			FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
+		if err != nil {
+			p.log.Errorf("failed to update parent level")
+			return errors.Wrap(err, "failed to update parent level")
+		}
 		return nil
 	}
 
