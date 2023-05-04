@@ -61,6 +61,12 @@ func (p *processor) HandleUpdateUserAction(msg data.ModulePayload) error {
 		return errors.New("failed to update user")
 	}
 
+	err = p.indexHasParentChild(user.GithubId, msg.Link)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to check has parent/child for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to check parent level")
+	}
+
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
 }

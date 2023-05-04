@@ -92,19 +92,9 @@ func (p *processor) HandleGetUsersAction(msg data.ModulePayload) error {
 				return errors.Wrap(err, "failed to upsert permission in permission db")
 			}
 
-			subPermission, err := p.subsQ.WithPermissions().FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).OrderBy("subs_link").Get()
+			err = p.indexHasParentChild(permission.GithubId, permission.Link)
 			if err != nil {
-				p.log.WithError(err).Errorf("failed to get permission for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "failed to get permission in permission db")
-			}
-			if subPermission == nil {
-				p.log.WithError(err).Errorf("got empty permission for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "got empty permission in permission db")
-			}
-
-			err = p.checkHasParent(*subPermission)
-			if err != nil {
-				p.log.WithError(err).Errorf("failed to check parent level for message action with id `%s`", msg.RequestId)
+				p.log.WithError(err).Errorf("failed to check has parent/child for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to check parent level")
 			}
 
