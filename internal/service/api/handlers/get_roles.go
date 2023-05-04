@@ -103,7 +103,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if permission == nil {
-		ape.RenderErr(w, problems.NotFound())
+		ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, ""))
 		return
 	}
 	ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, permission.AccessLevel))
