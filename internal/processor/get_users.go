@@ -167,6 +167,24 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 			p.log.Errorf("failed to update parent level")
 			return errors.Wrap(err, "failed to update parent level")
 		}
+
+		children, err := p.permissionsQ.FilterByGithubIds(parentPermission.GithubId).
+			FilterByParentLinks(parentPermission.Link).FilterByHasParent(false).Select()
+		if err != nil {
+			p.log.Errorf("failed to select parent children")
+			return errors.Wrap(err, "failed to select parent children")
+		}
+
+		hasChild := false
+		if len(children) != 0 {
+			hasChild = true
+		}
+		err = p.permissionsQ.FilterByGithubIds(parentPermission.GithubId).
+			FilterByLinks(parentPermission.Link).Update(data.PermissionToUpdate{HasChild: &hasChild})
+		if err != nil {
+			p.log.Errorf("failed to update parent level")
+			return errors.Wrap(err, "failed to update parent level")
+		}
 		return nil
 	}
 
