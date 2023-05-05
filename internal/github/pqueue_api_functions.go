@@ -115,3 +115,22 @@ func GetRequestError(queue *pqueue.PriorityQueue, function any, args []any, prio
 
 	return nil
 }
+
+func GetString(queue *pqueue.PriorityQueue, function any, args []any, priority int) (string, error) {
+	item, err := helpers.AddFunctionInPQueue(queue, function, args, priority)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to add function in pqueue")
+	}
+
+	err = item.Response.Error
+	if err != nil {
+		return "", errors.Wrap(err, "some error while getting permission from api")
+	}
+
+	str, ok := item.Response.Value.(string)
+	if !ok {
+		return "", errors.New("wrong response type")
+	}
+
+	return str, nil
+}
