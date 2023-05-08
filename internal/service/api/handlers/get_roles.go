@@ -136,11 +136,10 @@ func checkRemoteUser(r *http.Request, username, link string) (*resources.RolesRe
 		return nil, errors.Wrap(err, "failed to check user from api")
 	}
 
-	if permission == nil {
-		response := models.NewRolesResponse(true, typeSub.Type, owned, "")
-		return &response, nil
+	if permission != nil {
+		return nil, nil
 	}
 
-	response := models.NewRolesResponse(true, typeSub.Type, owned, permission.AccessLevel)
+	response := models.NewRolesResponse(true, typeSub.Type, owned, "")
 	return &response, nil
 }
