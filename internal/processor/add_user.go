@@ -2,6 +2,7 @@ package processor
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -28,7 +29,7 @@ func (p *processor) HandleAddUserAction(msg data.ModulePayload) error {
 		p.log.WithError(err).Errorf("failed to validate fields for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to validate fields")
 	}
-
+	msg.Link = strings.ToLower(msg.Link)
 	userId, err := strconv.ParseInt(msg.UserId, 10, 64)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to parse user id `%s` for message action with id `%s`", msg.UserId, msg.RequestId)

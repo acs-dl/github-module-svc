@@ -1,6 +1,8 @@
 package processor
 
 import (
+	"strings"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
@@ -24,6 +26,7 @@ func (p *processor) HandleUpdateUserAction(msg data.ModulePayload) error {
 		p.log.WithError(err).Errorf("failed to validate fields for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to validate fields")
 	}
+	msg.Link = strings.ToLower(msg.Link)
 
 	user, err := p.checkUserExistence(msg.Username)
 	if err != nil {

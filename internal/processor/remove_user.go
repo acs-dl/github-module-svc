@@ -1,6 +1,8 @@
 package processor
 
 import (
+	"strings"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
@@ -24,6 +26,7 @@ func (p *processor) HandleRemoveUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to validate fields")
 	}
 
+	msg.Link = strings.ToLower(msg.Link)
 	dbUser, err := p.usersQ.FilterByUsernames(msg.Username).Get()
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get user from user db for message action with id `%s`", msg.RequestId)

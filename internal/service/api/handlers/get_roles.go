@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
@@ -28,7 +29,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		ape.RenderErr(w, problems.NotFound())
 		return
 	}
-
+	link := strings.ToLower(*request.Link)
 	if request.Username == nil {
 		background.Log(r).Infof("no username was provided")
 		ape.RenderErr(w, problems.NotFound())
@@ -37,9 +38,9 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	githubClient := github.GithubClientInstance(background.ParentContext(r.Context()))
 
-	permission, err := background.PermissionsQ(r).FilterByUsernames(*request.Username).FilterByLinks(*request.Link).Get()
+	permission, err := background.PermissionsQ(r).FilterByUsernames(*request.Username).FilterByLinks(link).Get()
 	if err != nil {
-		background.Log(r).WithError(err).Infof("failed to get permission from `%s` for `%s`", *request.Link, *request.Username)
+		background.Log(r).WithError(err).Infof("failed to get permission from `%s` for `%s`", link, *request.Username)
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
@@ -50,7 +51,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 			owned, err = github.GetString(
 				pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue,
 				any(githubClient.FindRepositoryOwner),
-				[]any{any(*request.Link)},
+				[]any{any(link)},
 				pqueue.HighPriority,
 			)
 			if err != nil {
@@ -64,7 +65,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := checkRemoteUser(r, *request.Username, *request.Link)
+	response, err := checkRemoteUser(r, *request.Username, link)
 	if err != nil {
 		background.Log(r).WithError(err).Errorf("failed to check remote user")
 		ape.RenderErr(w, problems.InternalError())
