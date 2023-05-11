@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
@@ -24,9 +25,11 @@ func CheckSubmodule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sub, err := background.SubsQ(r).FilterByLinks(*request.Link).Get()
+	link := strings.ToLower(*request.Link)
+
+	sub, err := background.SubsQ(r).FilterByLinks(link).Get()
 	if err != nil {
-		background.Log(r).WithError(err).Errorf("failed to get link `%s`", *request.Link)
+		background.Log(r).WithError(err).Errorf("failed to get link `%s`", link)
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}

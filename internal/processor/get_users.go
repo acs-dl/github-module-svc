@@ -16,7 +16,7 @@ func (p *processor) validateGetUsers(msg data.ModulePayload) error {
 	}.Filter()
 }
 
-func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
+func (p *processor) HandleGetUsersAction(msg data.ModulePayload) error {
 	p.log.Infof("start handle message action with id `%s`", msg.RequestId)
 
 	err := p.validateGetUsers(msg)
@@ -92,19 +92,9 @@ func (p *processor) handleGetUsersAction(msg data.ModulePayload) error {
 				return errors.Wrap(err, "failed to upsert permission in permission db")
 			}
 
-			subPermission, err := p.subsQ.WithPermissions().FilterByGithubIds(permission.GithubId).FilterByLinks(permission.Link).OrderBy("subs_link").Get()
+			err = p.indexHasParentChild(permission.GithubId, permission.Link)
 			if err != nil {
-				p.log.WithError(err).Errorf("failed to get permission for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "failed to get permission in permission db")
-			}
-			if subPermission == nil {
-				p.log.WithError(err).Errorf("got empty permission for message action with id `%s`", msg.RequestId)
-				return errors.Wrap(err, "got empty permission in permission db")
-			}
-
-			err = p.checkHasParent(*subPermission)
-			if err != nil {
-				p.log.WithError(err).Errorf("failed to check parent level for message action with id `%s`", msg.RequestId)
+				p.log.WithError(err).Errorf("failed to check has parent/child for message action with id `%s`", msg.RequestId)
 				return errors.Wrap(err, "failed to check parent level")
 			}
 
@@ -170,6 +160,31 @@ func (p *processor) checkHasParent(permission data.Sub) error {
 	}
 
 	if permission.AccessLevel == parentPermission.AccessLevel {
+		hasParent := true
+		err = p.permissionsQ.FilterByGithubIds(permission.GithubId).
+			FilterByLinks(permission.Link).Update(data.PermissionToUpdate{HasParent: &hasParent})
+		if err != nil {
+			p.log.Errorf("failed to update parent level")
+			return errors.Wrap(err, "failed to update parent level")
+		}
+
+		children, err := p.permissionsQ.FilterByGithubIds(parentPermission.GithubId).
+			FilterByParentLinks(parentPermission.Link).FilterByHasParent(false).Select()
+		if err != nil {
+			p.log.Errorf("failed to select parent children")
+			return errors.Wrap(err, "failed to select parent children")
+		}
+
+		hasChild := false
+		if len(children) != 0 {
+			hasChild = true
+		}
+		err = p.permissionsQ.FilterByGithubIds(parentPermission.GithubId).
+			FilterByLinks(parentPermission.Link).Update(data.PermissionToUpdate{HasChild: &hasChild})
+		if err != nil {
+			p.log.Errorf("failed to update parent level")
+			return errors.Wrap(err, "failed to update parent level")
+		}
 		return nil
 	}
 

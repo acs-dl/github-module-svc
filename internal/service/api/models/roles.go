@@ -62,7 +62,7 @@ func NewRolesResponse(found bool, typeTo, owned, current string) resources.Roles
 }
 
 func newRolesArray(current string, roles []resources.AccessLevel) []resources.AccessLevel {
-	var result []resources.AccessLevel
+	result := make([]resources.AccessLevel, 0)
 
 	for _, role := range roles {
 		if role.Value != current {

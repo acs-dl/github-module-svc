@@ -2,6 +2,7 @@ package processor
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -20,7 +21,7 @@ func (p *processor) validateAddUser(msg data.ModulePayload) error {
 	}.Filter()
 }
 
-func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
+func (p *processor) HandleAddUserAction(msg data.ModulePayload) error {
 	p.log.Infof("start handle message action with id `%s`", msg.RequestId)
 
 	err := p.validateAddUser(msg)
@@ -28,7 +29,7 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		p.log.WithError(err).Errorf("failed to validate fields for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to validate fields")
 	}
-
+	msg.Link = strings.ToLower(msg.Link)
 	userId, err := strconv.ParseInt(msg.UserId, 10, 64)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to parse user id `%s` for message action with id `%s`", msg.UserId, msg.RequestId)
@@ -68,6 +69,12 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		if err = p.permissionsQ.FilterByGithubIds(permission.GithubId).Update(data.PermissionToUpdate{UserId: permission.UserId}); err != nil {
 			p.log.WithError(err).Errorf("failed to update user id in permission db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to update user id in user db")
+		}
+
+		err = p.indexHasParentChild(permission.GithubId, permission.Link)
+		if err != nil {
+			p.log.WithError(err).Errorf("failed to check has parent/child for message action with id `%s`", msg.RequestId)
+			return errors.Wrap(err, "failed to check parent level")
 		}
 
 		return nil

@@ -1,6 +1,8 @@
 package processor
 
 import (
+	"strings"
+
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
@@ -16,7 +18,7 @@ func (p *processor) validateUpdateUser(msg data.ModulePayload) error {
 	}.Filter()
 }
 
-func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
+func (p *processor) HandleUpdateUserAction(msg data.ModulePayload) error {
 	p.log.Infof("start handle message action with id `%s`", msg.RequestId)
 
 	err := p.validateUpdateUser(msg)
@@ -24,6 +26,7 @@ func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
 		p.log.WithError(err).Errorf("failed to validate fields for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to validate fields")
 	}
+	msg.Link = strings.ToLower(msg.Link)
 
 	user, err := p.checkUserExistence(msg.Username)
 	if err != nil {
@@ -59,6 +62,12 @@ func (p *processor) handleUpdateUserAction(msg data.ModulePayload) error {
 	if err != nil {
 		p.log.Errorf("failed to update user for message action with id `%s`", msg.RequestId)
 		return errors.New("failed to update user")
+	}
+
+	err = p.indexHasParentChild(user.GithubId, msg.Link)
+	if err != nil {
+		p.log.WithError(err).Errorf("failed to check has parent/child for message action with id `%s`", msg.RequestId)
+		return errors.Wrap(err, "failed to check parent level")
 	}
 
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)

@@ -2,17 +2,18 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
-	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
 	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
 	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
+	"gitlab.com/distributed_lab/acs/github-module/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func GetRoles(w http.ResponseWriter, r *http.Request) {
@@ -25,21 +26,21 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 	if request.Link == nil {
 		background.Log(r).Infof("no link was provided")
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
-
+	link := strings.ToLower(*request.Link)
 	if request.Username == nil {
 		background.Log(r).Infof("no username was provided")
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
+		ape.RenderErr(w, problems.NotFound())
 		return
 	}
 
 	githubClient := github.GithubClientInstance(background.ParentContext(r.Context()))
 
-	permission, err := background.PermissionsQ(r).FilterByUsernames(*request.Username).FilterByLinks(*request.Link).Get()
+	permission, err := background.PermissionsQ(r).FilterByUsernames(*request.Username).FilterByLinks(link).Get()
 	if err != nil {
-		background.Log(r).WithError(err).Infof("failed to get permission from `%s` for `%s`", *request.Link, *request.Username)
+		background.Log(r).WithError(err).Infof("failed to get permission from `%s` for `%s`", link, *request.Username)
 		ape.RenderErr(w, problems.BadRequest(err)...)
 		return
 	}
@@ -47,7 +48,12 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 	if permission != nil {
 		owned := data.OrganizationOwned
 		if permission.Type == data.Repository {
-			owned, err = getRepositoryOwnerType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
+			owned, err = github.GetString(
+				pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue,
+				any(githubClient.FindRepositoryOwner),
+				[]any{any(link)},
+				pqueue.HighPriority,
+			)
 			if err != nil {
 				background.Log(r).WithError(err).Errorf("failed to get repository owner type")
 				ape.RenderErr(w, problems.InternalError())
@@ -59,135 +65,83 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := getUser(pqueue.PQueuesInstance(background.ParentContext(r.Context())).UserPQueue, githubClient, *request.Username)
+	response, err := checkRemoteUser(r, *request.Username, link)
 	if err != nil {
-		background.Log(r).WithError(err).Errorf("failed to get user from api")
+		background.Log(r).WithError(err).Errorf("failed to check remote user")
 		ape.RenderErr(w, problems.InternalError())
 		return
+	}
+
+	if response == nil {
+		ape.RenderErr(w, problems.NotFound())
+		return
+	}
+
+	ape.Render(w, response)
+
+}
+
+func checkRemoteUser(r *http.Request, username, link string) (*resources.RolesResponse, error) {
+	githubClient := github.GithubClientInstance(background.ParentContext(r.Context()))
+
+	user, err := github.GetUser(
+		pqueue.PQueuesInstance(background.ParentContext(r.Context())).UserPQueue,
+		any(githubClient.GetUserFromApi),
+		[]any{any(username)},
+		pqueue.HighPriority,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get user from api")
 	}
 
 	if user == nil {
-		background.Log(r).Infof("no user with `%s` username in github", *request.Username)
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
-		return
+		background.Log(r).Warnf("no user `%s` in github", username)
+		return nil, nil
 	}
 
-	typeSub, err := getLinkType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
+	typeSub, err := github.GetPermissionWithType(
+		pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue,
+		any(githubClient.FindType),
+		[]any{any(link)},
+		pqueue.HighPriority,
+	)
 	if err != nil {
-		background.Log(r).WithError(err).Errorf("failed to get link type")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return nil, errors.Wrap(err, "failed to get link type")
 	}
 
 	if typeSub == nil {
-		background.Log(r).Infof("nothing found with `%s` link in github", *request.Link)
-		ape.Render(w, models.NewRolesResponse(false, "", "", ""))
-		return
+		background.Log(r).Warnf("nothing found for `%s` in github", username)
+		return nil, nil
 	}
 
 	owned := data.OrganizationOwned
 	if typeSub.Type == data.Repository {
-		owned, err = getRepositoryOwnerType(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link)
+		owned, err = github.GetString(
+			pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue,
+			any(githubClient.FindRepositoryOwner),
+			[]any{any(link)},
+			pqueue.HighPriority,
+		)
 		if err != nil {
-			background.Log(r).WithError(err).Errorf("failed to get repository owner type")
-			ape.RenderErr(w, problems.InternalError())
-			return
+			return nil, errors.Wrap(err, "failed to get repository owner")
 		}
 	}
 
-	permission, err = getPermission(pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue, githubClient, *request.Link, *request.Username, typeSub.Type)
+	permission, err := github.GetPermission(
+		pqueue.PQueuesInstance(background.ParentContext(r.Context())).SuperUserPQueue,
+		any(githubClient.CheckUserFromApi),
+		[]any{any(link), any(username), any(typeSub.Type)},
+		pqueue.HighPriority,
+	)
 	if err != nil {
-		background.Log(r).WithError(err).Errorf("failed to get permission for repository")
-		ape.RenderErr(w, problems.InternalError())
-		return
+		return nil, errors.Wrap(err, "failed to check user from api")
 	}
 
 	if permission == nil {
-		ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, ""))
-		return
-	}
-	ape.Render(w, models.NewRolesResponse(true, typeSub.Type, owned, permission.AccessLevel))
-
-}
-
-func getUser(pq *pqueue.PriorityQueue, githubClient github.GithubClient, username string) (*data.User, error) {
-	item, err := helpers.AddFunctionInPQueue(pq, any(githubClient.GetUserFromApi), []any{any(username)}, pqueue.HighPriority)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add function in pqueue")
+		response := models.NewRolesResponse(true, typeSub.Type, owned, "")
+		return &response, nil
 	}
 
-	err = item.Response.Error
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get user")
-	}
-
-	user, ok := item.Response.Value.(*data.User)
-	if !ok {
-		return nil, errors.Errorf("wrong response type")
-	}
-
-	return user, nil
-}
-
-func getLinkType(pq *pqueue.PriorityQueue, githubClient github.GithubClient, link string) (*github.TypeSub, error) {
-	item, err := helpers.AddFunctionInPQueue(pq, any(githubClient.FindType), []any{any(link)}, pqueue.HighPriority)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add function in pqueue")
-	}
-
-	err = item.Response.Error
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get type")
-	}
-
-	typeSub, ok := item.Response.Value.(*github.TypeSub)
-	if !ok {
-		return nil, errors.Errorf("wrong response type")
-	}
-
-	return typeSub, nil
-}
-
-func getRepositoryOwnerType(pq *pqueue.PriorityQueue, githubClient github.GithubClient, link string) (string, error) {
-	item, err := helpers.AddFunctionInPQueue(pq, any(githubClient.FindRepositoryOwner), []any{any(link)}, pqueue.HighPriority)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to add function in pqueue")
-	}
-
-	err = item.Response.Error
-	if err != nil {
-		return "", errors.Wrap(err, "some error while getting repo owner type")
-	}
-	var ok bool
-
-	owned, ok := item.Response.Value.(string)
-	if !ok {
-		return "", errors.Errorf("wrong response type")
-	}
-
-	return owned, nil
-}
-
-func getPermission(pq *pqueue.PriorityQueue, githubClient github.GithubClient, link, username, typeTo string) (*data.Permission, error) {
-	item, err := helpers.AddFunctionInPQueue(pq, any(githubClient.CheckUserFromApi), []any{any(link), any(username), any(typeTo)}, pqueue.HighPriority)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add function in pqueue")
-	}
-
-	err = item.Response.Error
-	if err != nil {
-		return nil, errors.Wrap(err, "some error while getting repo owner type")
-	}
-	var ok bool
-
-	permission, ok := item.Response.Value.(*data.Permission)
-	if !ok {
-		return nil, errors.Errorf("wrong response type")
-	}
-
-	if permission == nil {
-		return nil, nil
-	}
-
-	return permission, nil
+	response := models.NewRolesResponse(true, typeSub.Type, owned, permission.AccessLevel)
+	return &response, nil
 }

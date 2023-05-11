@@ -38,3 +38,20 @@ func (p *processor) isUserInSubmodule(link, username, typeTo string) (bool, erro
 
 	return permission != nil, err
 }
+
+func (p *processor) indexHasParentChild(githubId int64, link string) error {
+	subPermission, err := p.subsQ.WithPermissions().FilterByGithubIds(githubId).FilterByLinks(link).OrderBy("subs_link").Get()
+	if err != nil {
+		return errors.Wrap(err, "failed to get permission in permission db")
+	}
+	if subPermission == nil {
+		return errors.Wrap(err, "got empty permission in permission db")
+	}
+
+	err = p.checkHasParent(*subPermission)
+	if err != nil {
+		return errors.Wrap(err, "failed to check parent level")
+	}
+
+	return nil
+}

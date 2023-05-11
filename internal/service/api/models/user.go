@@ -8,6 +8,10 @@ import (
 )
 
 func NewUserModel(user data.User, id int) resources.User {
+	accessLevel := data.Roles[""]
+	if user.AccessLevel != nil {
+		accessLevel = data.Roles[*user.AccessLevel]
+	}
 	result := resources.User{
 		Key: resources.Key{
 			ID:   strconv.Itoa(id),
@@ -19,7 +23,7 @@ func NewUserModel(user data.User, id int) resources.User {
 			Module:      data.ModuleName,
 			CreatedAt:   &user.CreatedAt,
 			Submodule:   user.Submodule,
-			AccessLevel: user.AccessLevel,
+			AccessLevel: &accessLevel,
 		},
 	}
 
