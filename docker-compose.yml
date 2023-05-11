@@ -1,0 +1,11 @@
+version: '3.3'
+services:
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: "github"
+      POSTGRES_USER: "github"
+      POSTGRES_PASSWORD: "github"
+    ports:
+      - '5447:5432'

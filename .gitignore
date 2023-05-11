@@ -1,0 +1,8 @@
+.vscode/
+.idea/
+config.*.yaml
+docs/node_modules
+docs/web_deploy
+./github-module
+docker-compose.yml
+public
