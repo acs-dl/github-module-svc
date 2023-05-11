@@ -22,9 +22,9 @@ func (g *github) RemoveUserFromApi(link, username, typeTo string) error {
 		Body:   nil,
 		Query:  nil,
 		Header: map[string]string{
-			"Accept":               "application/vnd.Github+json",
-			"Authorization":        "Bearer " + g.superToken,
-			"X-GitHub-Api-Version": "2022-11-28",
+			"Accept":               data.AcceptHeader,
+			"Authorization":        "Bearer " + g.superUserToken,
+			"X-GitHub-Api-Version": data.GithubApiVersionHeader,
 		},
 		Timeout: time.Second * 30,
 	}

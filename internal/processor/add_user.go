@@ -35,54 +35,17 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to parse user id")
 	}
 
-	typeTo, err := p.getLinkType(msg.Link, pqueue.NormalPriority)
-	if err != nil {
-		p.log.WithError(err).Errorf("failed to get link type from API for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "some error while getting link type api")
-	}
-
-	checkPermission, err := github.GetPermissionWithCheck(
-		p.pqueues.SuperPQueue,
-		any(p.githubClient.CheckUserFromApi),
-		[]any{any(msg.Link), any(msg.Username), any(typeTo)},
-		pqueue.NormalPriority,
-	)
-	if err != nil {
-		p.log.WithError(err).Errorf("failed to check user from API for message action with id `%s`", msg.RequestId)
-		return errors.Wrap(err, "some error while checking link type api")
-	}
-
-	if checkPermission == nil {
-		p.log.Errorf("something wrong with user from API for message action with id `%s`", msg.RequestId)
-		return errors.New("something wrong with user from api")
-	}
-
-	if checkPermission.Ok {
-		p.log.Errorf("user is already in submodule from API for message action with id `%s`", msg.RequestId)
-		return errors.New("user is already in submodule")
-	}
-
-	permission, err := github.GetPermission(
-		p.pqueues.SuperPQueue,
-		any(p.githubClient.AddUserFromApi),
-		[]any{any(typeTo), any(msg.Link), any(msg.Username), any(msg.AccessLevel)},
-		pqueue.NormalPriority,
-	)
+	permission, err := p.addUser(msg.Link, msg.Username, msg.AccessLevel)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to add user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while adding user from api")
-	}
-
-	if permission == nil {
-		p.log.Errorf("something wrong with adding user for message action with id `%s`", msg.RequestId)
-		return errors.New("something wrong with adding user")
 	}
 
 	permission.UserId = &userId
 	permission.RequestId = msg.RequestId
 	permission.CreatedAt = time.Now()
 
-	dbUser := data.User{
+	user := data.User{
 		Id:        &userId,
 		Username:  permission.Username,
 		GithubId:  permission.GithubId,
@@ -91,7 +54,7 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 	}
 
 	err = p.managerQ.Transaction(func() error {
-		if err = p.usersQ.Upsert(dbUser); err != nil {
+		if err = p.usersQ.Upsert(user); err != nil {
 			p.log.WithError(err).Errorf("failed to creat user in user db for message action with id `%s`", msg.RequestId)
 			return errors.Wrap(err, "failed to create user in user db")
 		}
@@ -114,7 +77,7 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 		return errors.Wrap(err, "failed to make add user transaction")
 	}
 
-	err = p.SendDeleteUser(msg.RequestId, dbUser)
+	err = p.SendDeleteUser(msg.RequestId, user)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to publish users for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "failed to publish users")
@@ -122,4 +85,36 @@ func (p *processor) handleAddUserAction(msg data.ModulePayload) error {
 
 	p.log.Infof("finish handle message action with id `%s`", msg.RequestId)
 	return nil
+}
+
+func (p *processor) addUser(link, username, accessLevel string) (*data.Permission, error) {
+	typeTo, err := p.getLinkType(link, pqueue.NormalPriority)
+	if err != nil {
+		return nil, errors.Wrap(err, "some error while getting link type api")
+	}
+
+	isHere, err := p.isUserInSubmodule(link, username, typeTo)
+	if err != nil {
+		return nil, errors.Wrap(err, "some error while checking user for link")
+	}
+
+	if isHere {
+		return nil, errors.New("user is already in submodule")
+	}
+
+	permission, err := github.GetPermission(
+		p.pqueues.SuperUserPQueue,
+		any(p.githubClient.AddUserFromApi),
+		[]any{any(typeTo), any(link), any(username), any(accessLevel)},
+		pqueue.NormalPriority,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "some error while adding user from api")
+	}
+
+	if permission == nil {
+		return nil, errors.New("something wrong with adding user")
+	}
+
+	return permission, nil
 }

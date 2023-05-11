@@ -26,9 +26,6 @@ create table if not exists links (
     link text not null,
     unique(link)
 );
-insert into links (link) values ('mhrynenko/testapi');
-insert into links (link) values ('acstestapi');
-insert into links (link) values ('testapiacsdl');
 
 create index if not exists links_link_idx on links(link);
 

@@ -18,6 +18,7 @@ func Run(args []string) bool {
 	log := logan.New()
 
 	cfg := config.New(kv.MustFromEnv())
+
 	log = cfg.Log()
 
 	defer func() {

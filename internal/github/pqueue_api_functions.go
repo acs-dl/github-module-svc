@@ -26,25 +26,6 @@ func GetPermissionWithType(queue *pqueue.PriorityQueue, function any, args []any
 	return typeSub, nil
 }
 
-func GetPermissionWithCheck(queue *pqueue.PriorityQueue, function any, args []any, priority int) (*CheckPermission, error) {
-	item, err := helpers.AddFunctionInPQueue(queue, function, args, priority)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add function in pqueue")
-	}
-
-	err = item.Response.Error
-	if err != nil {
-		return nil, errors.Wrap(err, "some error while getting permission type")
-	}
-
-	checkPermission, ok := item.Response.Value.(*CheckPermission)
-	if !ok {
-		return nil, errors.New("wrong response type")
-	}
-
-	return checkPermission, nil
-}
-
 func GetUser(queue *pqueue.PriorityQueue, function any, args []any, priority int) (*data.User, error) {
 	item, err := helpers.AddFunctionInPQueue(queue, function, args, priority)
 	if err != nil {

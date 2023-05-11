@@ -27,9 +27,9 @@ func (g *github) AddOrUpdateUserInRepositoryFromApi(link, username, permission s
 		Body:   jsonBody,
 		Query:  nil,
 		Header: map[string]string{
-			"Accept":               "application/vnd.Github+json",
-			"Authorization":        "Bearer " + g.superToken,
-			"X-GitHub-Api-Version": "2022-11-28",
+			"Accept":               data.AcceptHeader,
+			"Authorization":        "Bearer " + g.superUserToken,
+			"X-GitHub-Api-Version": data.GithubApiVersionHeader,
 		},
 		Timeout: time.Second * 30,
 	}
@@ -57,31 +57,7 @@ func (g *github) AddOrUpdateUserInRepositoryFromApi(link, username, permission s
 		}, nil
 	}
 
-	response := struct {
-		Repository struct {
-			FullName string `json:"full_name"`
-		} `json:"repository"`
-		Invitee struct {
-			Login     string `json:"login"`
-			Id        int64  `json:"id"`
-			AvatarUrl string `json:"avatar_url"`
-		} `json:"invitee"`
-		Permissions string `json:"permissions"`
-	}{}
-
-	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal body")
-	}
-
-	return &data.Permission{
-		Link:        response.Repository.FullName,
-		Username:    response.Invitee.Login,
-		GithubId:    response.Invitee.Id,
-		AccessLevel: response.Permissions,
-		Type:        data.Repository,
-		AvatarUrl:   response.Invitee.AvatarUrl,
-	}, nil
-
+	return populateAddUserInRepositoryResponse(res)
 }
 
 func (g *github) AddOrUpdateUserInOrganizationFromApi(link, username, permission string) (*data.Permission, error) {
@@ -100,9 +76,9 @@ func (g *github) AddOrUpdateUserInOrganizationFromApi(link, username, permission
 		Body:   jsonBody,
 		Query:  nil,
 		Header: map[string]string{
-			"Accept":               "application/vnd.Github+json",
-			"Authorization":        "Bearer " + g.superToken,
-			"X-GitHub-Api-Version": "2022-11-28",
+			"Accept":               data.AcceptHeader,
+			"Authorization":        "Bearer " + g.superUserToken,
+			"X-GitHub-Api-Version": data.GithubApiVersionHeader,
 		},
 		Timeout: time.Second * 30,
 	}
@@ -120,27 +96,5 @@ func (g *github) AddOrUpdateUserInOrganizationFromApi(link, username, permission
 		return nil, nil
 	}
 
-	response := struct {
-		Repository struct {
-			FullName string `json:"login"`
-		} `json:"organization"`
-		Invitee struct {
-			Login string `json:"login"`
-			Id    int64  `json:"id"`
-		} `json:"user"`
-		Role string `json:"role"`
-	}{}
-
-	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal body")
-	}
-
-	return &data.Permission{
-		Link:        response.Repository.FullName,
-		Username:    response.Invitee.Login,
-		GithubId:    response.Invitee.Id,
-		AccessLevel: response.Role,
-		Type:        data.Organization,
-	}, nil
-
+	return populateAddUserInOrganizationResponse(res)
 }

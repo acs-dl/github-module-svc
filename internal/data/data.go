@@ -7,13 +7,14 @@ import (
 )
 
 const (
-	ModuleName        = "github"
-	Organization      = "org"
-	Repository        = "repo"
-	UserOwned         = "User"
-	OrganizationOwned = "Organization"
-	Push              = "push"
-	Group             = "group"
+	ModuleName             = "github"
+	Organization           = "org"
+	Repository             = "repo"
+	UserOwned              = "User"
+	OrganizationOwned      = "Organization"
+	Push                   = "push"
+	AcceptHeader           = "application/vnd.Github+json"
+	GithubApiVersionHeader = "2022-11-28"
 )
 
 type ModuleRequest struct {

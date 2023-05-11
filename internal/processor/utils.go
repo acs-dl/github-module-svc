@@ -4,11 +4,12 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/acs/github-module/internal/github"
+	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 func (p *processor) getLinkType(link string, priority int) (string, error) {
-	checkType, err := github.GetPermissionWithType(p.pqueues.SuperPQueue, any(p.githubClient.FindType), []any{any(link)}, priority)
+	checkType, err := github.GetPermissionWithType(p.pqueues.SuperUserPQueue, any(p.githubClient.FindType), []any{any(link)}, priority)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get link type")
 	}
@@ -22,4 +23,18 @@ func (p *processor) getLinkType(link string, priority int) (string, error) {
 	}
 
 	return checkType.Type, nil
+}
+
+func (p *processor) isUserInSubmodule(link, username, typeTo string) (bool, error) {
+	permission, err := github.GetPermission(
+		p.pqueues.SuperUserPQueue,
+		any(p.githubClient.CheckUserFromApi),
+		[]any{any(link), any(username), any(typeTo)},
+		pqueue.NormalPriority,
+	)
+	if err != nil {
+		return false, errors.Wrap(err, "some error while checking link type api")
+	}
+
+	return permission != nil, err
 }

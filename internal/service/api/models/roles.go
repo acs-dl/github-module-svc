@@ -40,7 +40,7 @@ func NewRolesModel(found bool, roles []resources.AccessLevel) resources.Roles {
 func NewRolesResponse(found bool, typeTo, owned, current string) resources.RolesResponse {
 	if !found {
 		return resources.RolesResponse{
-			Data: NewRolesModel(found, []resources.AccessLevel{}),
+			Data: NewRolesModel(found, make([]resources.AccessLevel, 0)),
 		}
 	}
 

@@ -35,7 +35,7 @@ func (p *processor) handleRemoveUserAction(msg data.ModulePayload) error {
 		return errors.New("no user with such username")
 	}
 
-	userApi, err := github.GetUser(p.pqueues.UsualPQueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
+	userApi, err := github.GetUser(p.pqueues.UserPQueue, any(p.githubClient.GetUserFromApi), []any{any(msg.Username)}, pqueue.NormalPriority)
 	if err != nil {
 		p.log.WithError(err).Errorf("failed to get user from API for message action with id `%s`", msg.RequestId)
 		return errors.Wrap(err, "some error while getting user from api")
@@ -53,7 +53,7 @@ func (p *processor) handleRemoveUserAction(msg data.ModulePayload) error {
 	}
 
 	err = github.GetRequestError(
-		p.pqueues.SuperPQueue,
+		p.pqueues.SuperUserPQueue,
 		any(p.githubClient.RemoveUserFromApi),
 		[]any{any(msg.Link), any(msg.Username), any(msg.Type)},
 		pqueue.NormalPriority)
