@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/acs-dl/github-module-svc/internal/data"
 	"github.com/fatih/structs"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 
 	sq "github.com/Masterminds/squirrel"

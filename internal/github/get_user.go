@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/internal/helpers"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 

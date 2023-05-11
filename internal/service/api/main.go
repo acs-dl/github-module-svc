@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
+	"github.com/acs-dl/github-module-svc/internal/config"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 

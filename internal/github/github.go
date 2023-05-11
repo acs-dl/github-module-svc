@@ -2,11 +2,11 @@ package github
 
 import (
 	"context"
-
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 	"gitlab.com/distributed_lab/logan/v3"
+
+	"github.com/acs-dl/github-module-svc/internal/config"
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/internal/service/background"
 )
 
 type GithubClient interface {

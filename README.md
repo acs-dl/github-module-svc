@@ -1,3 +1,3 @@
-# Service skeleton
+# Github module
 
-This is a module template for ACS modules
+Module for access control to Github repositories.

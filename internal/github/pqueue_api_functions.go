@@ -1,9 +1,9 @@
 package github
 
 import (
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/helpers"
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/internal/helpers"
+	"github.com/acs-dl/github-module-svc/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 

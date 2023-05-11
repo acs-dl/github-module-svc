@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
+	"github.com/acs-dl/github-module-svc/internal/service/background"
 )
 
 type PriorityQueueInterface interface {

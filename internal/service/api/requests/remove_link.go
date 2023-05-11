@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/acs-dl/github-module-svc/resources"
 	validation "github.com/go-ozzo/ozzo-validation"
-	"gitlab.com/distributed_lab/acs/github-module/resources"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 

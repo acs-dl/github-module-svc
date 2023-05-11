@@ -4,17 +4,17 @@ import (
 	"context"
 	"sync"
 
+	"github.com/acs-dl/github-module-svc/internal/config"
+	"github.com/acs-dl/github-module-svc/internal/github"
+	"github.com/acs-dl/github-module-svc/internal/pqueue"
+	"github.com/acs-dl/github-module-svc/internal/processor"
+	"github.com/acs-dl/github-module-svc/internal/receiver"
+	"github.com/acs-dl/github-module-svc/internal/registrator"
+	"github.com/acs-dl/github-module-svc/internal/sender"
+	"github.com/acs-dl/github-module-svc/internal/service/api"
+	"github.com/acs-dl/github-module-svc/internal/service/background"
+	"github.com/acs-dl/github-module-svc/internal/worker"
 	"github.com/pkg/errors"
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
-	"gitlab.com/distributed_lab/acs/github-module/internal/github"
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
-	"gitlab.com/distributed_lab/acs/github-module/internal/processor"
-	"gitlab.com/distributed_lab/acs/github-module/internal/receiver"
-	"gitlab.com/distributed_lab/acs/github-module/internal/registrator"
-	"gitlab.com/distributed_lab/acs/github-module/internal/sender"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
-	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
 )
 
 type svc struct {

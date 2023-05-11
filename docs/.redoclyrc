@@ -1,5 +1,5 @@
 
-apiTitle:  gitlab.com/distributed_lab/github-module
+apiTitle:  github.com/acs-dl/github-module-svc
 splitSpec: true
 codeSamples: false
 swaggerUI: true

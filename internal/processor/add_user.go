@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/internal/github"
+	"github.com/acs-dl/github-module-svc/internal/pqueue"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/github"
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 

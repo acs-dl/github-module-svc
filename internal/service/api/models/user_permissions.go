@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/resources"
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/resources"
 )
 
 func NewUserPermissionModel(permission data.Sub, counter int) resources.UserPermission {

@@ -3,12 +3,12 @@ package api
 import (
 	"fmt"
 
+	auth "github.com/acs-dl/auth-svc/middlewares"
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/internal/data/postgres"
+	"github.com/acs-dl/github-module-svc/internal/service/api/handlers"
+	"github.com/acs-dl/github-module-svc/internal/service/background"
 	"github.com/go-chi/chi"
-	auth "gitlab.com/distributed_lab/acs/auth/middlewares"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data/postgres"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/handlers"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
 	"gitlab.com/distributed_lab/ape"
 )
 

@@ -3,7 +3,7 @@ package registrator
 import (
 	"context"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
+	"github.com/acs-dl/github-module-svc/internal/config"
 )
 
 func Run(ctx context.Context, cfg config.Config) {

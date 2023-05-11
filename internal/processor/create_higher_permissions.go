@@ -3,7 +3,7 @@ package processor
 import (
 	"time"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
+	"github.com/acs-dl/github-module-svc/internal/data"
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 

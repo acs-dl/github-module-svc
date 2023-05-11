@@ -1,4 +1,4 @@
-module gitlab.com/distributed_lab/acs/github-module
+module github.com/acs-dl/github-module-svc
 
 go 1.18
 
@@ -6,6 +6,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/ThreeDotsLabs/watermill v1.2.0
 	github.com/ThreeDotsLabs/watermill-amqp/v2 v2.0.7
+	github.com/acs-dl/auth-svc v0.0.0-20230511071928-981aedca67a9
 	github.com/alecthomas/kingpin v2.2.6+incompatible
 	github.com/fatih/structs v1.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -14,7 +15,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/rubenv/sql-migrate v1.4.0
-	gitlab.com/distributed_lab/acs/auth v0.0.0-20230309115252-2c1f9e1d211a
 	gitlab.com/distributed_lab/ape v1.7.1
 	gitlab.com/distributed_lab/figure v2.1.2+incompatible
 	gitlab.com/distributed_lab/kit v1.11.2

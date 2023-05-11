@@ -3,8 +3,8 @@ package models
 import (
 	"strconv"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
-	"gitlab.com/distributed_lab/acs/github-module/resources"
+	"github.com/acs-dl/github-module-svc/internal/data"
+	"github.com/acs-dl/github-module-svc/resources"
 )
 
 func NewUserInfoModel(user data.User, id int) resources.UserInfo {

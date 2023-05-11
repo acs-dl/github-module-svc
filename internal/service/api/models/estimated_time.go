@@ -1,7 +1,7 @@
 package models
 
 import (
-	"gitlab.com/distributed_lab/acs/github-module/resources"
+	"github.com/acs-dl/github-module-svc/resources"
 )
 
 func NewEstimatedTimeModel(estimatedTime string) resources.EstimatedTime {

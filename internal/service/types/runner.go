@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/config"
+	"github.com/acs-dl/github-module-svc/internal/config"
 )
 
 type Runner = func(context context.Context, config config.Config)

@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/requests"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
+	"github.com/acs-dl/github-module-svc/internal/service/api/models"
+	"github.com/acs-dl/github-module-svc/internal/service/api/requests"
+	"github.com/acs-dl/github-module-svc/internal/service/background"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
 )

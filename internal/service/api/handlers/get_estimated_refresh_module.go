@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"gitlab.com/distributed_lab/acs/github-module/internal/pqueue"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/api/models"
-	"gitlab.com/distributed_lab/acs/github-module/internal/service/background"
-	"gitlab.com/distributed_lab/acs/github-module/internal/worker"
+	"github.com/acs-dl/github-module-svc/internal/pqueue"
+	"github.com/acs-dl/github-module-svc/internal/service/api/models"
+	"github.com/acs-dl/github-module-svc/internal/service/background"
+	"github.com/acs-dl/github-module-svc/internal/worker"
 	"gitlab.com/distributed_lab/ape"
 )
 

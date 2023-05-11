@@ -2,9 +2,9 @@ package postgres
 
 import (
 	sq "github.com/Masterminds/squirrel"
+	"github.com/acs-dl/github-module-svc/internal/data"
 	"github.com/fatih/structs"
 	"github.com/pkg/errors"
-	"gitlab.com/distributed_lab/acs/github-module/internal/data"
 	"gitlab.com/distributed_lab/kit/pgdb"
 )
 
