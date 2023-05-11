@@ -1,3 +1,3 @@
 # Github module
 
-Module for access control to Github repositories.
+Module for access control for Github repositories.
