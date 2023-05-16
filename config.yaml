@@ -10,10 +10,6 @@ amqp:
   publisher: "amqp://guest:guest@localhost:5672/" #github_publisher
   subscriber: "amqp://guest:guest@localhost:5672/" #github_receiver
 
-github:
-  super_token: "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" #access token for superuser for working with permissions
-  usual_token: "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" #access token for user for searching and getting users from api
-
 runners:
   registrar: 10m
   worker: 2h
