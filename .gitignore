@@ -3,6 +3,6 @@
 config.*.yaml
 docs/node_modules
 docs/web_deploy
-./github-module-svc
+github-module-svc
 docker-compose.yml
 public

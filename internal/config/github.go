@@ -1,27 +1,27 @@
 package config
 
 import (
-	"gitlab.com/distributed_lab/figure"
-	"gitlab.com/distributed_lab/kit/kv"
+	"encoding/json"
+	"os"
+
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
 
 type GithubCfg struct {
-	SuperToken string `figure:"super_token"`
-	UsualToken string `figure:"usual_token"`
+	SuperToken string `json:"super_token"`
+	UsualToken string `json:"usual_token"`
 }
 
 func (c *config) Github() *GithubCfg {
 	return c.github.Do(func() interface{} {
 		var cfg GithubCfg
-		err := figure.
-			Out(&cfg).
-			With(figure.BaseHooks).
-			From(kv.MustGetStringMap(c.getter, "github")).
-			Please()
-
+		value, ok := os.LookupEnv("github")
+		if !ok {
+			panic(errors.New("no github env variable"))
+		}
+		err := json.Unmarshal([]byte(value), &cfg)
 		if err != nil {
-			panic(errors.Wrap(err, "failed to figure out github params from config"))
+			panic(errors.Wrap(err, "failed to figure out github params from env variable"))
 		}
 
 		return &cfg
