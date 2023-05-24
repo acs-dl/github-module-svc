@@ -13,7 +13,8 @@ amqp:
   subscriber: "amqp://guest:guest@localhost:5672/" #github_receiver
 
 vault:
-
+  mount_path: "secret"
+  secret_path: "github"
 
 runners:
   registrar: 10m
