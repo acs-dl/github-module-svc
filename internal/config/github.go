@@ -1,8 +1,7 @@
 package config
 
 import (
-	"encoding/json"
-	"os"
+	knox "gitlab.com/distributed_lab/knox/knox-fork/client/external_kms"
 
 	"gitlab.com/distributed_lab/logan/v3/errors"
 )
@@ -15,14 +14,20 @@ type GithubCfg struct {
 func (c *config) Github() *GithubCfg {
 	return c.github.Do(func() interface{} {
 		var cfg GithubCfg
-		value, ok := os.LookupEnv("github")
-		if !ok {
-			panic(errors.New("no github env variable"))
-		}
-		err := json.Unmarshal([]byte(value), &cfg)
+		client := knox.NewKeyManagementClient(c.getter)
+
+		key, err := client.GetKey("super_token", "5165714923704681000")
 		if err != nil {
-			panic(errors.Wrap(err, "failed to figure out github params from env variable"))
+			panic(errors.Wrap(err, "failed to get super token key"))
 		}
+
+		cfg.SuperToken = string(key[:])
+
+		key, err = client.GetKey("usual_token", "3128228019338087400")
+		if err != nil {
+			panic(errors.Wrap(err, "failed to get usual token key"))
+		}
+		cfg.UsualToken = string(key[:])
 
 		return &cfg
 	}).(*GithubCfg)
