@@ -16,7 +16,7 @@ shell:
     - export CGO_ENABLED=0
     - export GO111MODULE=off
     - export GOOS=linux
-    - go build  -o /usr/local/bin/github-module-svc  /go/src/github.com/acs-dl/github-module-svc
+    - go build -mod vendor -o /usr/local/bin/github-module-svc  /go/src/github.com/acs-dl/github-module-svc
 
 ---
 image: service
