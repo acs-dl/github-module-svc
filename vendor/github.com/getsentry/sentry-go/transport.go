@@ -6,28 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
-
-	"github.com/getsentry/sentry-go/internal/ratelimit"
 )
 
 const defaultBufferSize = 30
+const defaultRetryAfter = time.Second * 60
 const defaultTimeout = time.Second * 30
-
-// maxDrainResponseBytes is the maximum number of bytes that transport
-// implementations will read from response bodies when draining them.
-//
-// Sentry's ingestion API responses are typically short and the SDK doesn't need
-// the contents of the response body. However, the net/http HTTP client requires
-// response bodies to be fully drained (and closed) for TCP keep-alive to work.
-//
-// maxDrainResponseBytes strikes a balance between reading too much data (if the
-// server is misbehaving) and reusing TCP connections.
-const maxDrainResponseBytes = 16 << 10
 
 // Transport is used by the Client to deliver events to remote server.
 type Transport interface {
@@ -38,13 +26,11 @@ type Transport interface {
 
 func getProxyConfig(options ClientOptions) func(*http.Request) (*url.URL, error) {
 	if options.HTTPSProxy != "" {
-		return func(*http.Request) (*url.URL, error) {
+		return func(_ *http.Request) (*url.URL, error) {
 			return url.Parse(options.HTTPSProxy)
 		}
-	}
-
-	if options.HTTPProxy != "" {
-		return func(*http.Request) (*url.URL, error) {
+	} else if options.HTTPProxy != "" {
+		return func(_ *http.Request) (*url.URL, error) {
 			return url.Parse(options.HTTPProxy)
 		}
 	}
@@ -54,8 +40,6 @@ func getProxyConfig(options ClientOptions) func(*http.Request) (*url.URL, error)
 
 func getTLSConfig(options ClientOptions) *tls.Config {
 	if options.CaCerts != nil {
-		// #nosec G402 -- We should be using `MinVersion: tls.VersionTLS12`,
-		// 				 but we don't want to break peoples code without the major bump.
 		return &tls.Config{
 			RootCAs: options.CaCerts,
 		}
@@ -64,13 +48,31 @@ func getTLSConfig(options ClientOptions) *tls.Config {
 	return nil
 }
 
+func retryAfter(now time.Time, r *http.Response) time.Duration {
+	retryAfterHeader := r.Header["Retry-After"]
+
+	if retryAfterHeader == nil {
+		return defaultRetryAfter
+	}
+
+	if date, err := time.Parse(time.RFC1123, retryAfterHeader[0]); err == nil {
+		return date.Sub(now)
+	}
+
+	if seconds, err := strconv.Atoi(retryAfterHeader[0]); err == nil {
+		return time.Second * time.Duration(seconds)
+	}
+
+	return defaultRetryAfter
+}
+
 func getRequestBodyFromEvent(event *Event) []byte {
 	body, err := json.Marshal(event)
 	if err == nil {
 		return body
 	}
 
-	msg := fmt.Sprintf("Could not encode original event as JSON. "+
+	partialMarshallMessage := fmt.Sprintf("Could not encode original event as JSON. "+
 		"Succeeded by removing Breadcrumbs, Contexts and Extra. "+
 		"Please verify the data you attach to the scope. "+
 		"Error: %s", err)
@@ -78,112 +80,54 @@ func getRequestBodyFromEvent(event *Event) []byte {
 	event.Breadcrumbs = nil
 	event.Contexts = nil
 	event.Extra = map[string]interface{}{
-		"info": msg,
+		"info": partialMarshallMessage,
 	}
 	body, err = json.Marshal(event)
 	if err == nil {
-		Logger.Println(msg)
+		Logger.Println(partialMarshallMessage)
 		return body
 	}
 
 	// This should _only_ happen when Event.Exception[0].Stacktrace.Frames[0].Vars is unserializable
 	// Which won't ever happen, as we don't use it now (although it's the part of public interface accepted by Sentry)
 	// Juuust in case something, somehow goes utterly wrong.
-	Logger.Println("Event couldn't be marshaled, even with stripped contextual data. Skipping delivery. " +
+	Logger.Println("Event couldn't be marshalled, even with stripped contextual data. Skipping delivery. " +
 		"Please notify the SDK owners with possibly broken payload.")
 	return nil
 }
 
-func transactionEnvelopeFromBody(event *Event, dsn *Dsn, sentAt time.Time, body json.RawMessage) (*bytes.Buffer, error) {
+func getEnvelopeFromBody(body []byte, now time.Time) *bytes.Buffer {
 	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-
-	// Construct the trace envelope header
-	var trace = map[string]string{}
-	if dsc := event.sdkMetaData.dsc; dsc.HasEntries() {
-		for k, v := range dsc.Entries {
-			trace[k] = v
-		}
-	}
-
-	// Envelope header
-	err := enc.Encode(struct {
-		EventID EventID           `json:"event_id"`
-		SentAt  time.Time         `json:"sent_at"`
-		Dsn     string            `json:"dsn"`
-		Sdk     map[string]string `json:"sdk"`
-		Trace   map[string]string `json:"trace,omitempty"`
-	}{
-		EventID: event.EventID,
-		SentAt:  sentAt,
-		Trace:   trace,
-		Dsn:     dsn.String(),
-		Sdk: map[string]string{
-			"name":    event.Sdk.Name,
-			"version": event.Sdk.Version,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Item header
-	err = enc.Encode(struct {
-		Type   string `json:"type"`
-		Length int    `json:"length"`
-	}{
-		Type:   transactionType,
-		Length: len(body),
-	})
-	if err != nil {
-		return nil, err
-	}
-	// payload
-	err = enc.Encode(body)
-	if err != nil {
-		return nil, err
-	}
-
-	return &b, nil
+	fmt.Fprintf(&b, `{"sent_at":"%s"}`, now.UTC().Format(time.RFC3339Nano))
+	fmt.Fprint(&b, "\n", `{"type":"transaction"}`, "\n")
+	b.Write(body)
+	return &b
 }
 
-func getRequestFromEvent(event *Event, dsn *Dsn) (r *http.Request, err error) {
-	defer func() {
-		if r != nil {
-			r.Header.Set("User-Agent", userAgent)
-		}
-	}()
+func getRequestFromEvent(event *Event, dsn *Dsn) (*http.Request, error) {
 	body := getRequestBodyFromEvent(event)
 	if body == nil {
-		return nil, errors.New("event could not be marshaled")
+		return nil, errors.New("event could not be marshalled")
 	}
+
 	if event.Type == transactionType {
-		b, err := transactionEnvelopeFromBody(event, dsn, time.Now(), body)
-		if err != nil {
-			return nil, err
-		}
-		return http.NewRequest(
+		env := getEnvelopeFromBody(body, time.Now())
+		request, _ := http.NewRequest(
 			http.MethodPost,
 			dsn.EnvelopeAPIURL().String(),
-			b,
+			env,
 		)
+
+		return request, nil
 	}
-	return http.NewRequest(
+
+	request, _ := http.NewRequest(
 		http.MethodPost,
 		dsn.StoreAPIURL().String(),
-		bytes.NewReader(body),
+		bytes.NewBuffer(body),
 	)
-}
 
-func categoryFor(eventType string) ratelimit.Category {
-	switch eventType {
-	case "":
-		return ratelimit.CategoryError
-	case transactionType:
-		return ratelimit.CategoryTransaction
-	default:
-		return ratelimit.Category(eventType)
-	}
+	return request, nil
 }
 
 // ================================
@@ -192,21 +136,12 @@ func categoryFor(eventType string) ratelimit.Category {
 
 // A batch groups items that are processed sequentially.
 type batch struct {
-	items   chan batchItem
+	items   chan *http.Request
 	started chan struct{} // closed to signal items started to be worked on
 	done    chan struct{} // closed to signal completion of all items
 }
 
-type batchItem struct {
-	request  *http.Request
-	category ratelimit.Category
-}
-
-// HTTPTransport is the default, non-blocking, implementation of Transport.
-//
-// Clients using this transport will enqueue requests in a buffer and return to
-// the caller before any network communication has happened. Requests are sent
-// to Sentry sequentially from a background goroutine.
+// HTTPTransport is a default implementation of Transport interface used by Client.
 type HTTPTransport struct {
 	dsn       *Dsn
 	client    *http.Client
@@ -223,8 +158,8 @@ type HTTPTransport struct {
 	// HTTP Client request timeout. Defaults to 30 seconds.
 	Timeout time.Duration
 
-	mu     sync.RWMutex
-	limits ratelimit.Map
+	mu            sync.RWMutex
+	disabledUntil time.Time
 }
 
 // NewHTTPTransport returns a new pre-configured instance of HTTPTransport.
@@ -232,7 +167,6 @@ func NewHTTPTransport() *HTTPTransport {
 	transport := HTTPTransport{
 		BufferSize: defaultBufferSize,
 		Timeout:    defaultTimeout,
-		limits:     make(ratelimit.Map),
 	}
 	return &transport
 }
@@ -251,7 +185,7 @@ func (t *HTTPTransport) Configure(options ClientOptions) {
 	// synchronized by reading from and writing to the channel.
 	t.buffer = make(chan batch, 1)
 	t.buffer <- batch{
-		items:   make(chan batchItem, t.BufferSize),
+		items:   make(chan *http.Request, t.BufferSize),
 		started: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
@@ -284,10 +218,10 @@ func (t *HTTPTransport) SendEvent(event *Event) {
 	if t.dsn == nil {
 		return
 	}
-
-	category := categoryFor(event.Type)
-
-	if t.disabled(category) {
+	t.mu.RLock()
+	disabled := time.Now().Before(t.disabledUntil)
+	t.mu.RUnlock()
+	if disabled {
 		return
 	}
 
@@ -314,19 +248,10 @@ func (t *HTTPTransport) SendEvent(event *Event) {
 	b := <-t.buffer
 
 	select {
-	case b.items <- batchItem{
-		request:  request,
-		category: category,
-	}:
-		var eventType string
-		if event.Type == transactionType {
-			eventType = "transaction"
-		} else {
-			eventType = fmt.Sprintf("%s event", event.Level)
-		}
+	case b.items <- request:
 		Logger.Printf(
-			"Sending %s [%s] to %s project: %s",
-			eventType,
+			"Sending %s event [%s] to %s project: %d\n",
+			event.Level,
 			event.EventID,
 			t.dsn.host,
 			t.dsn.projectID,
@@ -378,7 +303,7 @@ started:
 	close(b.items)
 	// Start a new batch for subsequent events.
 	t.buffer <- batch{
-		items:   make(chan batchItem, t.BufferSize),
+		items:   make(chan *http.Request, t.BufferSize),
 		started: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
@@ -407,23 +332,27 @@ func (t *HTTPTransport) worker() {
 		t.buffer <- b
 
 		// Process all batch items.
-		for item := range b.items {
-			if t.disabled(item.category) {
+		for request := range b.items {
+			t.mu.RLock()
+			disabled := time.Now().Before(t.disabledUntil)
+			t.mu.RUnlock()
+			if disabled {
 				continue
 			}
 
-			response, err := t.client.Do(item.request)
+			response, err := t.client.Do(request)
+
 			if err != nil {
 				Logger.Printf("There was an issue with sending an event: %v", err)
-				continue
 			}
-			t.mu.Lock()
-			t.limits.Merge(ratelimit.FromResponse(response))
-			t.mu.Unlock()
-			// Drain body up to a limit and close it, allowing the
-			// transport to reuse TCP connections.
-			_, _ = io.CopyN(io.Discard, response.Body, maxDrainResponseBytes)
-			response.Body.Close()
+
+			if response != nil && response.StatusCode == http.StatusTooManyRequests {
+				deadline := time.Now().Add(retryAfter(time.Now(), response))
+				t.mu.Lock()
+				t.disabledUntil = deadline
+				t.mu.Unlock()
+				Logger.Printf("Too many requests, backing off till: %s\n", deadline)
+			}
 		}
 
 		// Signal that processing of the batch is done.
@@ -431,38 +360,16 @@ func (t *HTTPTransport) worker() {
 	}
 }
 
-func (t *HTTPTransport) disabled(c ratelimit.Category) bool {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	disabled := t.limits.IsRateLimited(c)
-	if disabled {
-		Logger.Printf("Too many requests for %q, backing off till: %v", c, t.limits.Deadline(c))
-	}
-	return disabled
-}
-
 // ================================
 // HTTPSyncTransport
 // ================================
 
-// HTTPSyncTransport is a blocking implementation of Transport.
-//
-// Clients using this transport will send requests to Sentry sequentially and
-// block until a response is returned.
-//
-// The blocking behavior is useful in a limited set of use cases. For example,
-// use it when deploying code to a Function as a Service ("Serverless")
-// platform, where any work happening in a background goroutine is not
-// guaranteed to execute.
-//
-// For most cases, prefer HTTPTransport.
+// HTTPSyncTransport is an implementation of Transport interface which blocks after each captured event.
 type HTTPSyncTransport struct {
-	dsn       *Dsn
-	client    *http.Client
-	transport http.RoundTripper
-
-	mu     sync.Mutex
-	limits ratelimit.Map
+	dsn           *Dsn
+	client        *http.Client
+	transport     http.RoundTripper
+	disabledUntil time.Time
 
 	// HTTP Client request timeout. Defaults to 30 seconds.
 	Timeout time.Duration
@@ -472,7 +379,6 @@ type HTTPSyncTransport struct {
 func NewHTTPSyncTransport() *HTTPSyncTransport {
 	transport := HTTPSyncTransport{
 		Timeout: defaultTimeout,
-		limits:  make(ratelimit.Map),
 	}
 
 	return &transport
@@ -508,11 +414,7 @@ func (t *HTTPSyncTransport) Configure(options ClientOptions) {
 
 // SendEvent assembles a new packet out of Event and sends it to remote server.
 func (t *HTTPSyncTransport) SendEvent(event *Event) {
-	if t.dsn == nil {
-		return
-	}
-
-	if t.disabled(categoryFor(event.Type)) {
+	if t.dsn == nil || time.Now().Before(t.disabledUntil) {
 		return
 	}
 
@@ -525,48 +427,29 @@ func (t *HTTPSyncTransport) SendEvent(event *Event) {
 		request.Header.Set(headerKey, headerValue)
 	}
 
-	var eventType string
-	if event.Type == transactionType {
-		eventType = "transaction"
-	} else {
-		eventType = fmt.Sprintf("%s event", event.Level)
-	}
 	Logger.Printf(
-		"Sending %s [%s] to %s project: %s",
-		eventType,
+		"Sending %s event [%s] to %s project: %d\n",
+		event.Level,
 		event.EventID,
 		t.dsn.host,
 		t.dsn.projectID,
 	)
 
 	response, err := t.client.Do(request)
+
 	if err != nil {
 		Logger.Printf("There was an issue with sending an event: %v", err)
-		return
 	}
-	t.mu.Lock()
-	t.limits.Merge(ratelimit.FromResponse(response))
-	t.mu.Unlock()
 
-	// Drain body up to a limit and close it, allowing the
-	// transport to reuse TCP connections.
-	_, _ = io.CopyN(io.Discard, response.Body, maxDrainResponseBytes)
-	response.Body.Close()
+	if response != nil && response.StatusCode == http.StatusTooManyRequests {
+		t.disabledUntil = time.Now().Add(retryAfter(time.Now(), response))
+		Logger.Printf("Too many requests, backing off till: %s\n", t.disabledUntil)
+	}
 }
 
 // Flush is a no-op for HTTPSyncTransport. It always returns true immediately.
 func (t *HTTPSyncTransport) Flush(_ time.Duration) bool {
 	return true
-}
-
-func (t *HTTPSyncTransport) disabled(c ratelimit.Category) bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	disabled := t.limits.IsRateLimited(c)
-	if disabled {
-		Logger.Printf("Too many requests for %q, backing off till: %v", c, t.limits.Deadline(c))
-	}
-	return disabled
 }
 
 // ================================
@@ -577,16 +460,14 @@ func (t *HTTPSyncTransport) disabled(c ratelimit.Category) bool {
 // Only used internally when an empty DSN is provided, which effectively disables the SDK.
 type noopTransport struct{}
 
-var _ Transport = noopTransport{}
-
-func (noopTransport) Configure(ClientOptions) {
+func (t *noopTransport) Configure(options ClientOptions) {
 	Logger.Println("Sentry client initialized with an empty DSN. Using noopTransport. No events will be delivered.")
 }
 
-func (noopTransport) SendEvent(*Event) {
+func (t *noopTransport) SendEvent(event *Event) {
 	Logger.Println("Event dropped due to noopTransport usage.")
 }
 
-func (noopTransport) Flush(time.Duration) bool {
+func (t *noopTransport) Flush(_ time.Duration) bool {
 	return true
 }

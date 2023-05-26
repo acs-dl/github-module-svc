@@ -5,21 +5,12 @@ import (
 	"time"
 )
 
-// Deprecated: Use SDKVersion instead.
-const Version = SDKVersion
-
 // Version is the version of the SDK.
-const SDKVersion = "0.20.0"
-
-// The identifier of the SDK.
-const SDKIdentifier = "sentry.go"
+const Version = "0.7.0"
 
 // apiVersion is the minimum version of the Sentry API compatible with the
 // sentry-go SDK.
 const apiVersion = "7"
-
-// userAgent is the User-Agent of outgoing HTTP requests.
-const userAgent = "sentry-go/" + SDKVersion
 
 // Init initializes the SDK with options. The returned error is non-nil if
 // options is invalid, for instance if a malformed DSN is provided.
@@ -101,7 +92,7 @@ func ConfigureScope(f func(scope *Scope)) {
 	hub.ConfigureScope(f)
 }
 
-// PushScope is a shorthand for CurrentHub().PushScope.
+// PushScope is a shorthand for CurrentHub().PushPushScope.
 func PushScope() {
 	hub := CurrentHub()
 	hub.PushScope()
