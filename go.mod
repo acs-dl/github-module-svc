@@ -13,7 +13,6 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/vault/api v1.9.1
 	github.com/pkg/errors v0.9.1
 	github.com/rubenv/sql-migrate v1.4.0
 	gitlab.com/distributed_lab/ape v1.7.1
@@ -62,6 +61,7 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/hashicorp/vault/api v1.9.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
