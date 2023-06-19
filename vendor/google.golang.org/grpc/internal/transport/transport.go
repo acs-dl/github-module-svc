@@ -701,7 +701,7 @@ type ServerTransport interface {
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
-	Close(err error)
+	Close()
 
 	// RemoteAddr returns the remote network address.
 	RemoteAddr() net.Addr

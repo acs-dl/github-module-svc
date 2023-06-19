@@ -5,17 +5,15 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/getsentry/sentry-go/internal/debug"
 )
 
 // maxErrorDepth is the maximum number of errors reported in a chain of errors.
@@ -26,11 +24,6 @@ import (
 // is not optimized for long chains either. The top-level error together with a
 // stack trace is often the most useful information.
 const maxErrorDepth = 10
-
-// defaultMaxSpans limits the default number of recorded spans per transaction. The limit is
-// meant to bound memory usage and prevent too large transaction events that
-// would be rejected by Sentry.
-const defaultMaxSpans = 1000
 
 // hostname is the host name reported by the kernel. It is precomputed once to
 // avoid syscalls when capturing events.
@@ -63,7 +56,6 @@ func (r *lockedRand) Float64() float64 {
 // other hand, the source returned from rand.NewSource is not safe for
 // concurrent use, so we need to couple its use with a sync.Mutex.
 var rng = &lockedRand{
-	// #nosec G404 -- We are fine using transparent, non-secure value here.
 	r: rand.New(rand.NewSource(time.Now().UnixNano())),
 }
 
@@ -77,7 +69,7 @@ type usageError struct {
 
 // Logger is an instance of log.Logger that is use to provide debug information about running Sentry Client
 // can be enabled by either using Logger.SetOutput directly or with Debug client option.
-var Logger = log.New(io.Discard, "[Sentry] ", log.LstdFlags)
+var Logger = log.New(ioutil.Discard, "[Sentry] ", log.LstdFlags)
 
 // EventProcessor is a function that processes an event.
 // Event processors are used to change an event before it is sent to Sentry.
@@ -96,9 +88,7 @@ var globalEventProcessors []EventProcessor
 // AddGlobalEventProcessor adds processor to the global list of event
 // processors. Global event processors apply to all events.
 //
-// AddGlobalEventProcessor is deprecated. Most users will prefer to initialize
-// the SDK with Init and provide a ClientOptions.BeforeSend function or use
-// Scope.AddEventProcessor instead.
+// Deprecated: Use Scope.AddEventProcessor or Client.AddEventProcessor instead.
 func AddGlobalEventProcessor(processor EventProcessor) {
 	globalEventProcessors = append(globalEventProcessors, processor)
 }
@@ -120,30 +110,14 @@ type ClientOptions struct {
 	// Configures whether SDK should generate and attach stacktraces to pure
 	// capture message calls.
 	AttachStacktrace bool
-	// The sample rate for event submission in the range [0.0, 1.0]. By default,
-	// all events are sent. Thus, as a historical special case, the sample rate
-	// 0.0 is treated as if it was 1.0. To drop all events, set the DSN to the
-	// empty string.
+	// The sample rate for event submission (0.0 - 1.0, defaults to 1.0).
 	SampleRate float64
-	// Enable performance tracing.
-	EnableTracing bool
-	// The sample rate for sampling traces in the range [0.0, 1.0].
-	TracesSampleRate float64
-	// Used to customize the sampling of traces, overrides TracesSampleRate.
-	TracesSampler TracesSampler
 	// List of regexp strings that will be used to match against event's message
 	// and if applicable, caught errors type and value.
 	// If the match is found, then a whole event will be dropped.
 	IgnoreErrors []string
-	// If this flag is enabled, certain personally identifiable information (PII) is added by active integrations.
-	// By default, no such data is sent.
-	SendDefaultPII bool
-	// BeforeSend is called before error events are sent to Sentry.
-	// Use it to mutate the event or return nil to discard the event.
+	// Before send callback.
 	BeforeSend func(event *Event, hint *EventHint) *Event
-	// BeforeSendTransaction is called before transaction events are sent to Sentry.
-	// Use it to mutate the transaction or return nil to discard the transaction.
-	BeforeSendTransaction func(event *Event, hint *EventHint) *Event
 	// Before breadcrumb add callback.
 	BeforeBreadcrumb func(breadcrumb *Breadcrumb, hint *BreadcrumbHint) *Breadcrumb
 	// Integrations to be installed on the current Client, receives default
@@ -156,41 +130,13 @@ type ClientOptions struct {
 	// The server name to be reported.
 	ServerName string
 	// The release to be sent with events.
-	//
-	// Some Sentry features are built around releases, and, thus, reporting
-	// events with a non-empty release improves the product experience. See
-	// https://docs.sentry.io/product/releases/.
-	//
-	// If Release is not set, the SDK will try to derive a default value
-	// from environment variables or the Git repository in the working
-	// directory.
-	//
-	// If you distribute a compiled binary, it is recommended to set the
-	// Release value explicitly at build time. As an example, you can use:
-	//
-	// 	go build -ldflags='-X main.release=VALUE'
-	//
-	// That will set the value of a predeclared variable 'release' in the
-	// 'main' package to 'VALUE'. Then, use that variable when initializing
-	// the SDK:
-	//
-	// 	sentry.Init(ClientOptions{Release: release})
-	//
-	// See https://golang.org/cmd/go/ and https://golang.org/cmd/link/ for
-	// the official documentation of -ldflags and -X, respectively.
 	Release string
 	// The dist to be sent with events.
 	Dist string
 	// The environment to be sent with events.
 	Environment string
-	// Maximum number of breadcrumbs
-	// when MaxBreadcrumbs is negative then ignore breadcrumbs.
+	// Maximum number of breadcrumbs.
 	MaxBreadcrumbs int
-	// Maximum number of spans.
-	//
-	// See https://develop.sentry.dev/sdk/envelopes/#size-limits for size limits
-	// applied during event ingestion. Events that exceed these limits might get dropped.
-	MaxSpans int
 	// An optional pointer to http.Client that will be used with a default
 	// HTTPTransport. Using your own client will make HTTPTransport, HTTPProxy,
 	// HTTPSProxy and CaCerts options ignored.
@@ -208,35 +154,19 @@ type ClientOptions struct {
 	HTTPSProxy string
 	// An optional set of SSL certificates to use.
 	CaCerts *x509.CertPool
-	// MaxErrorDepth is the maximum number of errors reported in a chain of errors.
-	// This protects the SDK from an arbitrarily long chain of wrapped errors.
-	//
-	// An additional consideration is that arguably reporting a long chain of errors
-	// is of little use when debugging production errors with Sentry. The Sentry UI
-	// is not optimized for long chains either. The top-level error together with a
-	// stack trace is often the most useful information.
-	MaxErrorDepth int
 }
 
 // Client is the underlying processor that is used by the main API and Hub
-// instances. It must be created with NewClient.
+// instances.
 type Client struct {
 	options         ClientOptions
 	dsn             *Dsn
 	eventProcessors []EventProcessor
 	integrations    []Integration
-	// Transport is read-only. Replacing the transport of an existing client is
-	// not supported, create a new client instead.
-	Transport Transport
+	Transport       Transport
 }
 
-// NewClient creates and returns an instance of Client configured using
-// ClientOptions.
-//
-// Most users will not create clients directly. Instead, initialize the SDK with
-// Init and use the package-level functions (for simple programs that run on a
-// single goroutine) or hub methods (for concurrent programs, for example web
-// servers).
+// NewClient creates and returns an instance of Client configured using ClientOptions.
 func NewClient(options ClientOptions) (*Client, error) {
 	if options.Debug {
 		debugWriter := options.DebugWriter
@@ -251,42 +181,11 @@ func NewClient(options ClientOptions) (*Client, error) {
 	}
 
 	if options.Release == "" {
-		options.Release = defaultRelease()
+		options.Release = os.Getenv("SENTRY_RELEASE")
 	}
 
 	if options.Environment == "" {
 		options.Environment = os.Getenv("SENTRY_ENVIRONMENT")
-	}
-
-	if options.MaxErrorDepth == 0 {
-		options.MaxErrorDepth = maxErrorDepth
-	}
-
-	if options.MaxSpans == 0 {
-		options.MaxSpans = defaultMaxSpans
-	}
-
-	// SENTRYGODEBUG is a comma-separated list of key=value pairs (similar
-	// to GODEBUG). It is not a supported feature: recognized debug options
-	// may change any time.
-	//
-	// The intended public is SDK developers. It is orthogonal to
-	// options.Debug, which is also available for SDK users.
-	dbg := strings.Split(os.Getenv("SENTRYGODEBUG"), ",")
-	sort.Strings(dbg)
-	// dbgOpt returns true when the given debug option is enabled, for
-	// example SENTRYGODEBUG=someopt=1.
-	dbgOpt := func(opt string) bool {
-		s := opt + "=1"
-		return dbg[sort.SearchStrings(dbg, s)%len(dbg)] == s
-	}
-	if dbgOpt("httpdump") || dbgOpt("httptrace") {
-		options.HTTPTransport = &debug.Transport{
-			RoundTripper: http.DefaultTransport,
-			Output:       os.Stderr,
-			Dump:         dbgOpt("httpdump"),
-			Trace:        dbgOpt("httptrace"),
-		}
 	}
 
 	var dsn *Dsn
@@ -310,26 +209,17 @@ func NewClient(options ClientOptions) (*Client, error) {
 }
 
 func (client *Client) setupTransport() {
-	opts := client.options
-	transport := opts.Transport
+	transport := client.options.Transport
 
 	if transport == nil {
-		if opts.Dsn == "" {
+		if client.options.Dsn == "" {
 			transport = new(noopTransport)
 		} else {
-			httpTransport := NewHTTPTransport()
-			// When tracing is enabled, use larger buffer to
-			// accommodate more concurrent events.
-			// TODO(tracing): consider using separate buffers per
-			// event type.
-			if opts.EnableTracing {
-				httpTransport.BufferSize = 1000
-			}
-			transport = httpTransport
+			transport = NewHTTPTransport()
 		}
 	}
 
-	transport.Configure(opts)
+	transport.Configure(client.options)
 	client.Transport = transport
 }
 
@@ -354,19 +244,9 @@ func (client *Client) setupIntegrations() {
 		integration.SetupOnce(client)
 		Logger.Printf("Integration installed: %s\n", integration.Name())
 	}
-
-	sort.Slice(client.integrations, func(i, j int) bool {
-		return client.integrations[i].Name() < client.integrations[j].Name()
-	})
 }
 
-// AddEventProcessor adds an event processor to the client. It must not be
-// called from concurrent goroutines. Most users will prefer to use
-// ClientOptions.BeforeSend or Scope.AddEventProcessor instead.
-//
-// Note that typical programs have only a single client created by Init and the
-// client is shared among multiple hubs, one per goroutine, such that adding an
-// event processor to the client affects all hubs that share the client.
+// AddEventProcessor adds an event processor to the client.
 func (client *Client) AddEventProcessor(processor EventProcessor) {
 	client.eventProcessors = append(client.eventProcessors, processor)
 }
@@ -408,7 +288,7 @@ func (client *Client) Recover(err interface{}, hint *EventHint, scope EventModif
 	// use the Context for communicating deadline nor cancelation. All it does
 	// is store the Context in the EventHint and there nil means the Context is
 	// not available.
-	// nolint: staticcheck
+	//nolint: staticcheck
 	return client.RecoverWithContext(nil, err, hint, scope)
 }
 
@@ -492,7 +372,7 @@ func (client *Client) eventFromException(exception error, level Level) *Event {
 	event := NewEvent()
 	event.Level = level
 
-	for i := 0; i < client.options.MaxErrorDepth && err != nil; i++ {
+	for i := 0; i < maxErrorDepth && err != nil; i++ {
 		event.Exception = append(event.Exception, Exception{
 			Value:      err.Error(),
 			Type:       reflect.TypeOf(err).String(),
@@ -538,53 +418,29 @@ func (client *Client) processEvent(event *Event, hint *EventHint, scope EventMod
 
 	options := client.Options()
 
-	// The default error event sample rate for all SDKs is 1.0 (send all).
-	//
-	// In Go, the zero value (default) for float64 is 0.0, which means that
-	// constructing a client with NewClient(ClientOptions{}), or, equivalently,
-	// initializing the SDK with Init(ClientOptions{}) without an explicit
-	// SampleRate would drop all events.
-	//
-	// To retain the desired default behavior, we exceptionally flip SampleRate
-	// from 0.0 to 1.0 here. Setting the sample rate to 0.0 is not very useful
-	// anyway, and the same end result can be achieved in many other ways like
-	// not initializing the SDK, setting the DSN to the empty string or using an
-	// event processor that always returns nil.
-	//
-	// An alternative API could be such that default options don't need to be
-	// the same as Go's zero values, for example using the Functional Options
-	// pattern. That would either require a breaking change if we want to reuse
-	// the obvious NewClient name, or a new function as an alternative
-	// constructor.
-	if options.SampleRate == 0.0 {
-		options.SampleRate = 1.0
-	}
-
-	// Transactions are sampled by options.TracesSampleRate or
-	// options.TracesSampler when they are started. All other events
-	// (errors, messages) are sampled here.
-	if event.Type != transactionType && !sample(options.SampleRate) {
-		Logger.Println("Event dropped due to SampleRate hit.")
-		return nil
+	// TODO: Reconsider if its worth going away from default implementation
+	// of other SDKs. In Go zero value (default) for float32 is 0.0,
+	// which means that if someone uses ClientOptions{} struct directly
+	// and we would not check for 0 here, we'd skip all events by default
+	if options.SampleRate != 0.0 {
+		randomFloat := rng.Float64()
+		if randomFloat > options.SampleRate {
+			Logger.Println("Event dropped due to SampleRate hit.")
+			return nil
+		}
 	}
 
 	if event = client.prepareEvent(event, hint, scope); event == nil {
 		return nil
 	}
 
-	// Apply beforeSend* processors
-	if hint == nil {
-		hint = &EventHint{}
-	}
-	if event.Type == transactionType && options.BeforeSendTransaction != nil {
-		// Transaction events
-		if event = options.BeforeSendTransaction(event, hint); event == nil {
-			Logger.Println("Transaction dropped due to BeforeSendTransaction callback.")
-			return nil
+	// As per spec, transactions do not go through BeforeSend.
+	if event.Type != transactionType && options.BeforeSend != nil {
+		h := &EventHint{}
+		if hint != nil {
+			h = hint
 		}
-	} else if event.Type != transactionType && options.BeforeSend != nil {
-		// All other events
-		if event = options.BeforeSend(event, hint); event == nil {
+		if event = options.BeforeSend(event, h); event == nil {
 			Logger.Println("Event dropped due to BeforeSend callback.")
 			return nil
 		}
@@ -601,7 +457,7 @@ func (client *Client) prepareEvent(event *Event, hint *EventHint, scope EventMod
 	}
 
 	if event.Timestamp.IsZero() {
-		event.Timestamp = time.Now()
+		event.Timestamp = time.Now().UTC()
 	}
 
 	if event.Level == "" {
@@ -609,33 +465,33 @@ func (client *Client) prepareEvent(event *Event, hint *EventHint, scope EventMod
 	}
 
 	if event.ServerName == "" {
-		event.ServerName = client.Options().ServerName
-
-		if event.ServerName == "" {
+		if client.Options().ServerName != "" {
+			event.ServerName = client.Options().ServerName
+		} else {
 			event.ServerName = hostname
 		}
 	}
 
-	if event.Release == "" {
+	if event.Release == "" && client.Options().Release != "" {
 		event.Release = client.Options().Release
 	}
 
-	if event.Dist == "" {
+	if event.Dist == "" && client.Options().Dist != "" {
 		event.Dist = client.Options().Dist
 	}
 
-	if event.Environment == "" {
+	if event.Environment == "" && client.Options().Environment != "" {
 		event.Environment = client.Options().Environment
 	}
 
 	event.Platform = "go"
 	event.Sdk = SdkInfo{
-		Name:         SDKIdentifier,
-		Version:      SDKVersion,
+		Name:         "sentry.go",
+		Version:      Version,
 		Integrations: client.listIntegrations(),
 		Packages: []SdkPackage{{
 			Name:    "sentry-go",
-			Version: SDKVersion,
+			Version: Version,
 		}},
 	}
 
@@ -668,10 +524,11 @@ func (client *Client) prepareEvent(event *Event, hint *EventHint, scope EventMod
 }
 
 func (client Client) listIntegrations() []string {
-	integrations := make([]string, len(client.integrations))
-	for i, integration := range client.integrations {
-		integrations[i] = integration.Name()
+	integrations := make([]string, 0, len(client.integrations))
+	for _, integration := range client.integrations {
+		integrations = append(integrations, integration.Name())
 	}
+	sort.Strings(integrations)
 	return integrations
 }
 
@@ -682,10 +539,4 @@ func (client Client) integrationAlreadyInstalled(name string) bool {
 		}
 	}
 	return false
-}
-
-// sample returns true with the given probability, which must be in the range
-// [0.0, 1.0].
-func sample(probability float64) bool {
-	return rng.Float64() < probability
 }

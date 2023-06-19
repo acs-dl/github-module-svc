@@ -15,11 +15,6 @@ import (
 	"time"
 )
 
-func (w *writer) WriteFrameNoFlush(frame frame) (err error) {
-	err = frame.write(w.w)
-	return
-}
-
 func (w *writer) WriteFrame(frame frame) (err error) {
 	if err = frame.write(w.w); err != nil {
 		return
@@ -68,8 +63,8 @@ func (f *heartbeatFrame) write(w io.Writer) (err error) {
 // +----------+--------+-----------+----------------+------------- - -
 // | class-id | weight | body size | property flags | property list...
 // +----------+--------+-----------+----------------+------------- - -
+//    short     short    long long       short        remainder...
 //
-//	short     short    long long       short        remainder...
 func (f *headerFrame) write(w io.Writer) (err error) {
 	var payload bytes.Buffer
 	var zeroTime time.Time
@@ -281,8 +276,7 @@ func writeLongstr(w io.Writer, s string) (err error) {
 'S': string
 'T': time.Time
 'V': nil
-'b': int8
-'B': byte
+'b': byte
 'd': float64
 'f': float32
 'l': int64
@@ -305,13 +299,8 @@ func writeField(w io.Writer, value interface{}) (err error) {
 		enc = buf[:2]
 
 	case byte:
-		buf[0] = 'B'
-		buf[1] = v
-		enc = buf[:2]
-
-	case int8:
 		buf[0] = 'b'
-		buf[1] = uint8(v)
+		buf[1] = v
 		enc = buf[:2]
 
 	case int16:
@@ -423,5 +412,5 @@ func writeTable(w io.Writer, table Table) (err error) {
 		}
 	}
 
-	return writeLongstr(w, buf.String())
+	return writeLongstr(w, string(buf.Bytes()))
 }

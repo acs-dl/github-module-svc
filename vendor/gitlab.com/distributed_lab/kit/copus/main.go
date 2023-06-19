@@ -47,7 +47,11 @@ func (c *generalCopuser) Copus() types.Copus {
 		}
 
 		if copuser == nil {
-			return cop.NewNoOp()
+			panic(errors.Wrap(
+				errors.New("failed to create copuser"),
+				"failed to get any of keys",
+				logan.F{"keys": keys(serviceSlice)},
+			))
 		}
 
 		return copuser.Copus()

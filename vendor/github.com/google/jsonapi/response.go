@@ -283,7 +283,7 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 				node.ClientID = clientID
 			}
 		} else if annotation == annotationAttribute {
-			var omitEmpty, iso8601, rfc3339 bool
+			var omitEmpty, iso8601 bool
 
 			if len(args) > 2 {
 				for _, arg := range args[2:] {
@@ -292,8 +292,6 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 						omitEmpty = true
 					case annotationISO8601:
 						iso8601 = true
-					case annotationRFC3339:
-						rfc3339 = true
 					}
 				}
 			}
@@ -311,8 +309,6 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 
 				if iso8601 {
 					node.Attributes[args[1]] = t.UTC().Format(iso8601TimeFormat)
-				} else if rfc3339 {
-					node.Attributes[args[1]] = t.UTC().Format(time.RFC3339)
 				} else {
 					node.Attributes[args[1]] = t.Unix()
 				}
@@ -333,8 +329,6 @@ func visitModelNode(model interface{}, included *map[string]*Node,
 
 					if iso8601 {
 						node.Attributes[args[1]] = tm.UTC().Format(iso8601TimeFormat)
-					} else if rfc3339 {
-						node.Attributes[args[1]] = tm.UTC().Format(time.RFC3339)
 					} else {
 						node.Attributes[args[1]] = tm.Unix()
 					}

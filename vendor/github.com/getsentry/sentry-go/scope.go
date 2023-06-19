@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -27,10 +28,11 @@ type Scope struct {
 	breadcrumbs []*Breadcrumb
 	user        User
 	tags        map[string]string
-	contexts    map[string]Context
+	contexts    map[string]interface{}
 	extra       map[string]interface{}
 	fingerprint []string
 	level       Level
+	transaction string
 	request     *http.Request
 	// requestBody holds a reference to the original request.Body.
 	requestBody interface {
@@ -49,7 +51,7 @@ func NewScope() *Scope {
 	scope := Scope{
 		breadcrumbs: make([]*Breadcrumb, 0),
 		tags:        make(map[string]string),
-		contexts:    make(map[string]Context),
+		contexts:    make(map[string]interface{}),
 		extra:       make(map[string]interface{}),
 		fingerprint: make([]string, 0),
 	}
@@ -61,15 +63,17 @@ func NewScope() *Scope {
 // and optionally throws the old one if limit is reached.
 func (scope *Scope) AddBreadcrumb(breadcrumb *Breadcrumb, limit int) {
 	if breadcrumb.Timestamp.IsZero() {
-		breadcrumb.Timestamp = time.Now()
+		breadcrumb.Timestamp = time.Now().UTC()
 	}
 
 	scope.mu.Lock()
 	defer scope.mu.Unlock()
 
-	scope.breadcrumbs = append(scope.breadcrumbs, breadcrumb)
-	if len(scope.breadcrumbs) > limit {
-		scope.breadcrumbs = scope.breadcrumbs[1 : limit+1]
+	breadcrumbs := append(scope.breadcrumbs, breadcrumb)
+	if len(breadcrumbs) > limit {
+		scope.breadcrumbs = breadcrumbs[1 : limit+1]
+	} else {
+		scope.breadcrumbs = breadcrumbs
 	}
 }
 
@@ -144,7 +148,7 @@ const maxRequestBodyBytes = 10 * 1024
 
 // A limitedBuffer is like a bytes.Buffer, but limited to store at most Capacity
 // bytes. Any writes past the capacity are silently discarded, similar to
-// io.Discard.
+// ioutil.Discard.
 type limitedBuffer struct {
 	Capacity int
 
@@ -207,7 +211,7 @@ func (scope *Scope) RemoveTag(key string) {
 }
 
 // SetContext adds a context to the current scope.
-func (scope *Scope) SetContext(key string, value Context) {
+func (scope *Scope) SetContext(key string, value interface{}) {
 	scope.mu.Lock()
 	defer scope.mu.Unlock()
 
@@ -215,7 +219,7 @@ func (scope *Scope) SetContext(key string, value Context) {
 }
 
 // SetContexts assigns multiple contexts to the current scope.
-func (scope *Scope) SetContexts(contexts map[string]Context) {
+func (scope *Scope) SetContexts(contexts map[string]interface{}) {
 	scope.mu.Lock()
 	defer scope.mu.Unlock()
 
@@ -274,6 +278,14 @@ func (scope *Scope) SetLevel(level Level) {
 	scope.level = level
 }
 
+// SetTransaction sets new transaction name for the current transaction.
+func (scope *Scope) SetTransaction(transactionName string) {
+	scope.mu.Lock()
+	defer scope.mu.Unlock()
+
+	scope.transaction = transactionName
+}
+
 // Clone returns a copy of the current scope with all data copied over.
 func (scope *Scope) Clone() *Scope {
 	scope.mu.RLock()
@@ -295,9 +307,10 @@ func (scope *Scope) Clone() *Scope {
 	clone.fingerprint = make([]string, len(scope.fingerprint))
 	copy(clone.fingerprint, scope.fingerprint)
 	clone.level = scope.level
+	clone.transaction = scope.transaction
 	clone.request = scope.request
 	clone.requestBody = scope.requestBody
-	clone.eventProcessors = scope.eventProcessors
+
 	return clone
 }
 
@@ -320,12 +333,16 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
 	defer scope.mu.RUnlock()
 
 	if len(scope.breadcrumbs) > 0 {
+		if event.Breadcrumbs == nil {
+			event.Breadcrumbs = []*Breadcrumb{}
+		}
+
 		event.Breadcrumbs = append(event.Breadcrumbs, scope.breadcrumbs...)
 	}
 
 	if len(scope.tags) > 0 {
 		if event.Tags == nil {
-			event.Tags = make(map[string]string, len(scope.tags))
+			event.Tags = make(map[string]string)
 		}
 
 		for key, value := range scope.tags {
@@ -335,29 +352,17 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
 
 	if len(scope.contexts) > 0 {
 		if event.Contexts == nil {
-			event.Contexts = make(map[string]Context)
+			event.Contexts = make(map[string]interface{})
 		}
 
 		for key, value := range scope.contexts {
-			if key == "trace" && event.Type == transactionType {
-				// Do not override trace context of
-				// transactions, otherwise it breaks the
-				// transaction event representation.
-				// For error events, the trace context is used
-				// to link errors and traces/spans in Sentry.
-				continue
-			}
-
-			// Ensure we are not overwriting event fields
-			if _, ok := event.Contexts[key]; !ok {
-				event.Contexts[key] = value
-			}
+			event.Contexts[key] = value
 		}
 	}
 
 	if len(scope.extra) > 0 {
 		if event.Extra == nil {
-			event.Extra = make(map[string]interface{}, len(scope.extra))
+			event.Extra = make(map[string]interface{})
 		}
 
 		for key, value := range scope.extra {
@@ -365,16 +370,22 @@ func (scope *Scope) ApplyToEvent(event *Event, hint *EventHint) *Event {
 		}
 	}
 
-	if event.User.IsEmpty() {
+	if (reflect.DeepEqual(event.User, User{})) {
 		event.User = scope.user
 	}
 
-	if len(event.Fingerprint) == 0 {
-		event.Fingerprint = append(event.Fingerprint, scope.fingerprint...)
+	if (event.Fingerprint == nil || len(event.Fingerprint) == 0) &&
+		len(scope.fingerprint) > 0 {
+		event.Fingerprint = make([]string, len(scope.fingerprint))
+		copy(event.Fingerprint, scope.fingerprint)
 	}
 
 	if scope.level != "" {
 		event.Level = scope.level
+	}
+
+	if scope.transaction != "" {
+		event.Transaction = scope.transaction
 	}
 
 	if event.Request == nil && scope.request != nil {
