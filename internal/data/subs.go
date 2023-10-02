@@ -19,6 +19,7 @@ type Subs interface {
 	WithPermissions() Subs
 	FilterByGithubIds(githubIds ...int64) Subs
 	FilterByUserIds(userIds ...int64) Subs
+	FilterByUsernames(usernames ...string) Subs
 	FilterByHasParent(level bool) Subs
 
 	OrderBy(columns ...string) Subs
